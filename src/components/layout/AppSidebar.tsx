@@ -4,7 +4,7 @@ import { useAuthGate } from '@/contexts/AuthGateContext';
 import {
   LayoutDashboard, Sparkles, FolderOpen, Settings,
   ChevronRight, ChevronLeft, Video, UserCircle, Mic, FileText,
-  ChevronDown, Flame, X, LogOut
+  ChevronDown, Flame, X, LogOut, Building2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { OpenGuideTourButton } from '@/components/GuidedTour';
@@ -12,6 +12,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 const mainMenuItems = [
   { title: 'דשבורד', icon: LayoutDashboard, path: '/' },
+  { title: 'חברות ומותגים', icon: Building2, path: '/brands' },
   { title: 'סטודיו קריאייטיב', icon: Sparkles, path: '/creative-studio' },
   { title: 'פרויקטים', icon: FolderOpen, path: '/projects' },
   { title: 'טרנדים חזקים', icon: Flame, path: '/trends' },
