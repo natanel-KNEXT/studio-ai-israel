@@ -4,16 +4,23 @@ const corsHeaders = {
 };
 
 async function claudeAPI(system: string, user: string): Promise<string> {
-  const KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!KEY) throw new Error("ANTHROPIC_API_KEY לא מוגדר");
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
+  const KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!KEY) throw new Error("LOVABLE_API_KEY לא מוגדר");
+  const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
-    headers: { "x-api-key": KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 2048, system, messages: [{ role: "user", content: user }] }),
+    headers: { "Authorization": `Bearer ${KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      max_tokens: 2048,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+    }),
   });
-  if (!r.ok) throw new Error(`Claude error ${r.status}`);
+  if (!r.ok) throw new Error(`AI gateway error ${r.status}`);
   const d = await r.json();
-  return d.content?.[0]?.text || "";
+  return d.choices?.[0]?.message?.content || "";
 }
 
 function extractJSON(text: string): any {
