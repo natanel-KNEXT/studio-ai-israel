@@ -16,6 +16,7 @@ import ScriptsManagePage from "./pages/capabilities/ScriptsPage";
 import TrendsPage from "./pages/TrendsPage";
 import LoginPage from "./pages/LoginPage";
 import ProofTestPage from "./pages/ProofTestPage";
+import BrandSettingsPage from "./pages/BrandSettingsPage";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +40,8 @@ function AppRoutes() {
       <Route path="/capabilities/voices" element={<ProtectedRoute><VoicesManagePage /></ProtectedRoute>} />
       <Route path="/capabilities/scripts" element={<ProtectedRoute><ScriptsManagePage /></ProtectedRoute>} />
       <Route path="/trends" element={<ProtectedRoute><TrendsPage /></ProtectedRoute>} />
+      <Route path="/brands" element={<ProtectedRoute><BrandSettingsPage /></ProtectedRoute>} />
+      <Route path="/brand-settings" element={<ProtectedRoute><BrandSettingsPage /></ProtectedRoute>} />
       <Route path="/proof-test" element={<ProtectedRoute><ProofTestPage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="*" element={<ProtectedRoute><NotFound /></ProtectedRoute>} />
