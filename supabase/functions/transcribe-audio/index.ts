@@ -138,6 +138,28 @@ Deno.serve(async (req) => {
     let effectiveSourceUrl = sourceAudioUrl || "inline-audio";
 
     if (sourceAudioUrl) {
+      // SSRF protection: only allow https URLs to public hosts
+      try {
+        const parsed = new URL(sourceAudioUrl);
+        if (parsed.protocol !== "https:") {
+          return new Response(
+            JSON.stringify({ error: "Only HTTPS audio URLs are allowed", captions: [] }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const BLOCKED = /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|localhost|::1|0\.0\.0\.0)/i;
+        if (BLOCKED.test(parsed.hostname)) {
+          return new Response(
+            JSON.stringify({ error: "Private/internal URLs are not allowed", captions: [] }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      } catch {
+        return new Response(
+          JSON.stringify({ error: "Invalid audio URL", captions: [] }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       const sourceResponse = await fetch(sourceAudioUrl);
       if (!sourceResponse.ok) {
         const bodyText = await sourceResponse.text();
