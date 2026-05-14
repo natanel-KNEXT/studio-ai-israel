@@ -19,6 +19,23 @@ Deno.serve(async (req) => {
     if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = `https://${formattedUrl}`;
     }
+    // SSRF protection: enforce HTTPS and block private/internal hosts
+    const BLOCKED_HOSTS = /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|localhost|::1|0\.0\.0\.0)/i;
+    try {
+      const parsed = new URL(formattedUrl);
+      if (parsed.protocol !== 'https:') {
+        return new Response(JSON.stringify({ success: false, error: 'HTTPS only' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (BLOCKED_HOSTS.test(parsed.hostname)) {
+        return new Response(JSON.stringify({ success: false, error: 'Private/internal URLs are not allowed' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      formattedUrl = parsed.toString();
+    } catch {
+      return new Response(JSON.stringify({ success: false, error: 'Invalid URL' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     const apiKey = Deno.env.get('FIRECRAWL_API_KEY');
 
