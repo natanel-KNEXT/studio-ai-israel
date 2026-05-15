@@ -6,63 +6,135 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-async function claudeAPI(system: string, user: string, maxTokens = 3000): Promise<string> {
-  const KEY = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!KEY) throw new Error("ANTHROPIC_API_KEY לא מוגדר");
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "x-api-key": KEY, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }),
-  });
-  if (!r.ok) { const t = await r.text(); throw new Error(`Claude error ${r.status}: ${t.slice(0, 200)}`); }
-  const d = await r.json();
-  return d.content?.[0]?.text || "";
-}
-
-function extractJSON(text: string): any {
-  const clean = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-  try { return JSON.parse(clean); } catch {}
-  const start = clean.indexOf("{");
-  if (start !== -1) {
-    let depth = 0, inStr = false, esc = false;
-    for (let i = start; i < clean.length; i++) {
-      const ch = clean[i];
-      if (esc) { esc = false; continue; }
-      if (ch === "\\") { esc = true; continue; }
-      if (ch === '"') { inStr = !inStr; continue; }
-      if (inStr) continue;
-      if (ch === "{") depth++;
-      if (ch === "}") { depth--; if (depth === 0) { try { return JSON.parse(clean.slice(start, i + 1)); } catch {} } }
-    }
-  }
-  throw new Error("לא הצלחתי לפרסר JSON");
-}
-
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const { text, type } = await req.json();
-    if (!text?.trim()) return new Response(JSON.stringify({ error: "יש להזין טקסט" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const enhanceSystem = `אתה מומחה שיווק ותוכן וידאו בעברית. קח רעיון גולמי והפוך אותו לבריף מקצועי.
-החזר JSON בלבד: {"enhanced":"הבריף המשופר עם הוק, גוף, הוכחה חברתית וCTA","variations":[{"type":"גרסת מכירה","text":"..."},{"type":"גרסת UGC","text":"..."},{"type":"גרסת תוכן אישי","text":"..."}]}
-- עברית מקצועית טבעית, לא תרגום מאנגלית
-- גרסת מכירה: ישירה, CTA חזק, דחיפות
-- גרסת UGC: אותנטית, גוף ראשון, וואטסאפ-סגנון
-- גרסת תוכן אישי: אישית, מעוררת השראה`;
+    let systemPrompt = "";
 
-    const scriptSystem = `אתה כותב תסריטים מקצועי לסרטוני וידאו בעברית.
-החזר JSON בלבד: {"script":"התסריט המלא","scenes":[{"title":"שם הסצנה","spokenText":"2-3 משפטים טבעיים","visualDescription":"מה רואים","duration":10}]}
-- עברית ישראלית טבעית
-- פתיח ב-3 שניות שתופס תשומת לב
-- סיום עם CTA ברור`;
+    if (type === "enhance") {
+      systemPrompt = `אתה מומחה שיווק ותוכן וידאו בעברית. תפקידך לקחת רעיון גולמי ולהפוך אותו לבריף מקצועי ומסודר ליצירת סרטון.
 
-    const raw = await claudeAPI(type === "script" ? scriptSystem : enhanceSystem, text);
-    try { return new Response(JSON.stringify(extractJSON(raw)), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
-    catch { return new Response(JSON.stringify(type === "script" ? { script: raw, scenes: [] } : { enhanced: raw, variations: [] }), { headers: { ...corsHeaders, "Content-Type": "application/json" } }); }
+עליך להחזיר JSON בפורמט הבא בלבד (ללא טקסט נוסף):
+{
+  "enhanced": "הבריף המשופר עם מבנה של הוק, גוף, הוכחה חברתית וקריאה לפעולה",
+  "variations": [
+    {"type": "גרסת מכירה", "text": "..."},
+    {"type": "גרסת UGC", "text": "..."},
+    {"type": "גרסת תוכן אישי", "text": "..."}
+  ]
+}
+
+הנחיות חשובות:
+- כתוב בעברית מקצועית, טבעית ושוטפת — כמו קופירייטר ישראלי מנוסה
+- הימנע מתרגום מאנגלית — כתוב כאילו עברית היא שפת האם שלך
+- השתמש בביטויים ישראליים אותנטיים, לא מליצות ותרגומים ישירים
+- כל וריאציה צריכה להיות שונה בסגנון ובטון
+- גרסת מכירה: ישירה, עם CTA חזק, דחיפות — בשפה שמוכרת בישראל
+- גרסת UGC: אותנטית, בגוף ראשון, כאילו מישהו מספר לחבר בוואטסאפ
+- גרסת תוכן אישי: אישית, מעוררת השראה, סיפור אישי אמיתי
+- הבריף המשופר צריך לכלול: הוק (פתיח תופס), גוף (בעיה + פתרון), הוכחה חברתית, וקריאה לפעולה
+- אם יש שמות מוצרים או מותגים באנגלית — השאר אותם באנגלית
+- הקפד על פיסוק נכון, ניקוד תקין (אם רלוונטי), וסדר מילים טבעי בעברית`;
+    } else if (type === "script") {
+      systemPrompt = `אתה כותב תסריטים מקצועי לסרטוני וידאו בעברית. תפקידך ליצור תסריט מוכן לצילום/הקלטה.
+
+עליך להחזיר JSON בפורמט הבא בלבד (ללא טקסט נוסף):
+{
+  "script": "התסריט המלא שהאווטאר יגיד",
+  "scenes": [
+    {"title": "שם הסצנה", "spokenText": "מה נאמר", "visualDescription": "מה רואים", "duration": 5}
+  ]
+}
+
+הנחיות חשובות:
+- כתוב בעברית ישראלית טבעית — כמו שאדם אמיתי מדבר, לא כמו תרגום
+- השתמש במשפטים קצרים וברורים, מתאימים לדיבור מול מצלמה
+- הימנע ממילים גבוהות או ספרותיות — כתוב בגובה העיניים
+- כל סצנה עם טקסט מדובר ותיאור חזותי מפורט
+- פתיח חד שתופס תשומת לב ב-3 שניות הראשונות
+- סיום עם קריאה לפעולה ברורה ופשוטה
+- שמור על קצב — משפטים קצרים, הפסקות טבעיות
+- אם יש מונחים מקצועיים — הסבר אותם בפשטות`;
+    }
+
+    const modelsToTry = [
+      "google/gemini-2.5-flash-lite",
+      "google/gemini-2.5-flash",
+      "openai/gpt-5-nano",
+    ];
+
+    let response: Response | null = null;
+    let lastErrorText = "";
+
+    for (const model of modelsToTry) {
+      console.log(`Trying enhance model: ${model}`);
+      const attempt = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: text },
+          ],
+        }),
+      });
+
+      if (attempt.ok) {
+        response = attempt;
+        break;
+      }
+
+      lastErrorText = await attempt.text();
+      console.warn(`Enhance model ${model} failed: ${attempt.status} ${lastErrorText.slice(0, 200)}`);
+
+      if (attempt.status === 429) {
+        return new Response(JSON.stringify({ error: "יותר מדי בקשות, נסה שוב בעוד רגע" }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (attempt.status !== 402 && attempt.status < 500) break;
+    }
+
+    if (!response) {
+      console.error("All enhance models failed:", lastErrorText.slice(0, 300));
+      return new Response(JSON.stringify({ error: "שגיאה בשירות ה-AI — כל המודלים נכשלו" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+
+    // Try to parse JSON from the response
+    let parsed;
+    try {
+      // Extract JSON from potential markdown code blocks
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
+      parsed = JSON.parse(jsonMatch[1].trim());
+    } catch {
+      parsed = { enhanced: content, variations: [] };
+    }
+
+    return new Response(JSON.stringify(parsed), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     console.error("enhance-prompt error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "שגיאה" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "שגיאה לא ידועה" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });

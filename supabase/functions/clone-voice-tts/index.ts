@@ -91,26 +91,11 @@ const providerErrorResponse = (params: {
     params.status
   );
 
-const BLOCKED_HOSTS = /^(10\.|127\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|localhost|::1|0\.0\.0\.0)/i;
-
-const isSafeHttpsUrl = (raw: string): boolean => {
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol !== "https:") return false;
-    if (BLOCKED_HOSTS.test(parsed.hostname)) return false;
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 const downloadVoiceSample = async (
   audioUrl: string,
   supabase: ReturnType<typeof createClient>
 ): Promise<{ arrayBuffer: ArrayBuffer; contentType: string; ext: string }> => {
-  const directResponse = isSafeHttpsUrl(audioUrl)
-    ? await fetch(audioUrl)
-    : new Response(null, { status: 400 });
+  const directResponse = await fetch(audioUrl);
   if (directResponse.ok) {
     const contentType = directResponse.headers.get("content-type") || "audio/webm";
     const ext = extFromMime(contentType, "webm");

@@ -212,7 +212,6 @@ export function StudioWizardDialog({ open, onOpenChange, activeBrand, activeBran
   useEffect(() => {
     if (open) {
       avatarDbService.list().then(list => setAvailableAvatars(list)).catch(() => {});
-      // Voices live in yfezjihpwlooktxyxfdt — read via voice-manager edge function
       supabase.functions.invoke('voice-manager', { body: { action: 'list' } })
         .then(({ data }) => {
           if (data?.voices) setAvailableVoices(data.voices);

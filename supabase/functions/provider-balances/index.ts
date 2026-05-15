@@ -127,17 +127,20 @@ async function checkCloudinary(cloudName: string, apiKey: string, apiSecret: str
   return { ok: true, remaining: Math.round((100 - usedPct) * 100) / 100, total: 100, used: Math.round(usedPct * 100) / 100, unit: "% מהמכסה" };
 }
 
-/* ── Perplexity AI ── */
-async function checkPerplexityAI(apiKey: string): Promise<BalanceResult> {
-  const res = await fetch("https://api.perplexity.ai/chat/completions", {
+/* ── Lovable AI ── */
+async function checkLovableAI(apiKey: string): Promise<BalanceResult> {
+  // Lovable AI gateway doesn't expose a safe balance endpoint.
+  // A minimal ping costs credits. We only check auth via a tiny request.
+  // The 402 response confirms credits exhausted.
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "sonar", messages: [{ role: "user", content: "ping" }], max_tokens: 1 }),
+    body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: "1" }], max_tokens: 1 }),
   });
   if (res.status === 401 || res.status === 403) return unknown("בקשות", "מפתח API לא תקין");
   if (res.status === 402) return { ok: true, remaining: 0, total: null, used: null, unit: "בקשות", reason: "קרדיטים נגמרו" };
-  if (res.status === 429) return unknown("בקשות", "מוגבל זמנית — הספק פעיל ותקין");
-  if (res.ok) return unknown("בקשות", "Perplexity AI פעיל ותקין");
+  if (res.status === 429) return unknown("בקשות", "מוגבל זמנית (rate limit) — הקרדיטים כנראה תקינים");
+  if (res.ok) return unknown("בקשות", "Lovable AI לא חושף מספר קרדיטים מדויק — הספק פעיל ותקין");
   return unknown("בקשות", `HTTP ${res.status}`);
 }
 
@@ -156,7 +159,7 @@ Deno.serve(async (req) => {
     const cloudKey = Deno.env.get("CLOUDINARY_API_KEY");
     const cloudSecret = Deno.env.get("CLOUDINARY_API_SECRET");
     const kreaKey = Deno.env.get("KREA_API_KEY");
-    const perplexityKey = Deno.env.get("PERPLEXITY_API_KEY");
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
 
     const tasks: [string, Promise<BalanceResult>][] = [];
     if (elevenLabsKey) tasks.push(["elevenlabs", withTimeout(checkElevenLabs(elevenLabsKey), "elevenlabs")]);
@@ -165,7 +168,7 @@ Deno.serve(async (req) => {
     if (shotstackKey) tasks.push(["shotstack", withTimeout(checkShotstack(shotstackKey), "shotstack")]);
     if (cloudName && cloudKey && cloudSecret) tasks.push(["cloudinary", withTimeout(checkCloudinary(cloudName, cloudKey, cloudSecret), "cloudinary")]);
     if (kreaKey) tasks.push(["krea", withTimeout(checkKrea(kreaKey), "krea")]);
-    if (perplexityKey) tasks.push(["perplexity_ai", withTimeout(checkPerplexityAI(perplexityKey), "perplexity_ai")]);
+    if (lovableKey) tasks.push(["lovable_ai", withTimeout(checkLovableAI(lovableKey), "lovable_ai")]);
 
     const settled = await Promise.allSettled(tasks.map(([, p]) => p));
     for (let i = 0; i < tasks.length; i++) {

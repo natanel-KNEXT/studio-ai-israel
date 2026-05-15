@@ -107,18 +107,7 @@ export const voiceService = {
         let apiError = `שגיאה ביצירת קריינות: ${response.status}`;
         try {
           const data = await response.json();
-          if (data?.error) {
-            apiError = data.error;
-            // Append provider error details if available
-            if (data?.providerError) {
-              const detail = typeof data.providerError === 'string'
-                ? data.providerError
-                : JSON.stringify(data.providerError);
-              if (detail && detail !== 'null' && detail !== '{}') {
-                apiError += `\nפרטים: ${detail.slice(0, 400)}`;
-              }
-            }
-          }
+          if (data?.error) apiError = data.error;
         } catch {
           // ignore json parsing issues
         }
@@ -162,26 +151,29 @@ export const avatarGenService = {
 // ====== Avatar DB Service (CRUD) ======
 export const avatarDbService = {
   list: async () => {
-    // Direct DB query — data lives in Lovable project (fyfqyeouyxotohtxlbdg)
-    const { data, error } = await supabase.from("avatars").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase.functions.invoke("avatar-manager", {
+      body: { action: "list" },
+    });
     if (error) throw new Error(error.message || "שגיאה בטעינת אווטארים");
-    return data || [];
+    if (data?.error) throw new Error(data.error);
+    return data.avatars || [];
   },
 
   save: async (name: string, imageUrl: string, style: string, sourcePhotos: string[]) => {
-    const { data, error } = await supabase.from("avatars").insert({
-      name,
-      image_url: imageUrl,
-      style,
-      source_photos: sourcePhotos,
-    }).select().single();
+    const { data, error } = await supabase.functions.invoke("avatar-manager", {
+      body: { action: "save", name, image_url: imageUrl, style, source_photos: sourcePhotos },
+    });
     if (error) throw new Error(error.message || "שגיאה בשמירת אווטאר");
-    return data;
+    if (data?.error) throw new Error(data.error);
+    return data.avatar;
   },
 
   remove: async (id: string) => {
-    const { error } = await supabase.from("avatars").delete().eq("id", id);
+    const { data, error } = await supabase.functions.invoke("avatar-manager", {
+      body: { action: "delete", id },
+    });
     if (error) throw new Error(error.message || "שגיאה במחיקת אווטאר");
+    if (data?.error) throw new Error(data.error);
   },
 };
 
@@ -269,7 +261,6 @@ export const composeService = {
     sourceWidth?: number;
     sourceHeight?: number;
     captionPosition?: string;
-    shotstackEnv?: 'production' | 'stage';
   }): Promise<{
     renderId: string | null;
     status: string;
@@ -278,7 +269,6 @@ export const composeService = {
     subtitleCount: number;
     logoPlacementSummary: any;
     shotstackEnv?: 'production' | 'stage';
-    providerErrorDetail?: string | null;
   }> => {
     const { data, error } = await supabase.functions.invoke("compose-video", {
       body: { action: "render", ...params },
@@ -293,7 +283,6 @@ export const composeService = {
       subtitleCount: Number(data?.subtitleCount) || 0,
       logoPlacementSummary: data?.logoPlacementSummary ?? null,
       shotstackEnv: data?.shotstackEnv,
-      providerErrorDetail: data?.providerErrorDetail ?? null,
     };
   },
 

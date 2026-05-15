@@ -29,24 +29,29 @@ export function AuthGateProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Auto-authenticate in local development
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      setIsAuthenticated(true);
-      setLoading(false);
-      return;
-    }
     setIsAuthenticated(!!getSession());
     setLoading(false);
   }, []);
 
   const login = async (username: string, password: string): Promise<string | null> => {
-    if (username === '12345' && password === '12345') {
-      const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: 'local', expiresAt }));
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/auth-gate`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) return data.error || 'שגיאה בהתחברות';
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: data.token, expiresAt: data.expiresAt }));
       setIsAuthenticated(true);
       return null;
+    } catch {
+      return 'שגיאת רשת';
     }
-    return 'שם משתמש או סיסמה שגויים';
   };
 
   const logout = () => {

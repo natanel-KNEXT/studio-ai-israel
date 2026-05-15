@@ -83,7 +83,6 @@ interface DurationPreset {
 const DURATION_PRESETS: DurationPreset[] = [
   { label: '30 שניות', seconds: 30, videoTypes: ['marketing'] },
   { label: '40 שניות', seconds: 40, videoTypes: ['marketing'] },
-  { label: '50 שניות', seconds: 50, videoTypes: ['marketing'] },
   { label: '60 שניות', seconds: 60, videoTypes: ['marketing'] },
   { label: '2 דקות', seconds: 120, videoTypes: ['podcast', 'episode'] },
   { label: '3 דקות', seconds: 180, videoTypes: ['podcast', 'episode'] },
@@ -332,16 +331,10 @@ export function VideoWizardFlow({
   const [runwayPolling, setRunwayPolling] = useState(false);
   const [runwayProgress, setRunwayProgress] = useState(0);
   const [progressStage, setProgressStage] = useState('');
-  const [generationStartTime, setGenerationStartTime] = useState<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [generationLogs, setGenerationLogs] = useState<{ type: 'info' | 'warning' | 'error'; msg: string }[]>([]);
 
   // Improve / refine
   const [improvePrompt, setImprovePrompt] = useState(restoredSession?.improvePrompt ?? '');
   const [isImproving, setIsImproving] = useState(false);
-
-  // Error modal (persistent — replaces disappearing toast for generation errors)
-  const [videoError, setVideoError] = useState<string | null>(null);
 
   // Save
   const [savingOutput, setSavingOutput] = useState(false);
@@ -371,15 +364,6 @@ export function VideoWizardFlow({
   const [showCostApproval, setShowCostApproval] = useState(false);
   const [costEstimates, setCostEstimates] = useState<CostEstimate[]>([]);
   const [pendingAction, setPendingAction] = useState<'generate' | 'improve' | null>(null);
-
-  // Elapsed time timer during generation
-  useEffect(() => {
-    if (step !== 3 || generationStartTime === null) return;
-    const interval = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - generationStartTime) / 1000));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [step, generationStartTime]);
 
   // Emit session changes to parent for persistence
   useEffect(() => {
@@ -429,8 +413,7 @@ export function VideoWizardFlow({
   };
 
   const selectedAvatars = avatars.filter(a => selectedAvatarIds.includes(a.id));
-  // is_verified may not exist in DB schema — treat any voice with provider_voice_id as eligible
-  const eligibleVoices = voices.filter(v => Boolean(v.provider_voice_id));
+  const eligibleVoices = voices.filter(v => Boolean(v.provider_voice_id && v.is_verified));
   const selectedVoices = eligibleVoices.filter(v => selectedVoiceIds.includes(v.id));
 
   useEffect(() => {
@@ -449,8 +432,8 @@ export function VideoWizardFlow({
 
   const toggleVoice = (id: string) => {
     const voice = voices.find((v) => v.id === id);
-    if (!voice?.provider_voice_id) {
-      toast.error('לקול זה אין מזהה ספק. הוסף קול מדף הקולות.');
+    if (!voice?.provider_voice_id || !voice?.is_verified) {
+      toast.error('הקול לא מאומת עדיין. בצע איפוס/שכפול ואימות בדף הקולות.');
       return;
     }
 
@@ -851,12 +834,6 @@ export function VideoWizardFlow({
     setRunwayPolling(true);
     setRunwayProgress(0);
     setProgressStage('מכין את הייצור...');
-    setGenerationStartTime(Date.now());
-    setElapsedSeconds(0);
-    setGenerationLogs([]);
-    const logGen = (type: 'info' | 'warning' | 'error', msg: string) => {
-      setGenerationLogs(prev => [...prev, { type, msg }]);
-    };
 
     try {
       const avatarImage = selectedAvatars[0]?.image_url;
@@ -950,16 +927,14 @@ export function VideoWizardFlow({
         if (runwayBlocked || !runwayReady) {
           if (heygenReady) {
             forceDidOnlyMode = true;
-            logGen('warning', `Runway: ${getStatusLabel('runway') || 'לא זמין'} — עובר אוטומטית למסלול HeyGen.`);
             toast.warning(`Runway: ${getStatusLabel('runway') || 'לא זמין'} — עובר אוטומטית למסלול HeyGen.`);
           } else if (kreaReady) {
             forceKreaOnlyMode = true;
-            logGen('warning', `Runway: ${getStatusLabel('runway') || 'לא זמין'} — עובר למסלול Krea.`);
             toast.warning(`Runway: ${getStatusLabel('runway') || 'לא זמין'} — עובר למסלול Krea.`);
           } else if (runwayBlocked && heygenBlocked && kreaBlocked) {
             throw new Error(`כל ספקי הווידאו חסומים:\n• Runway: ${getStatusLabel('runway')}\n• HeyGen: ${getStatusLabel('heygen')}\n• Krea: ${getStatusLabel('krea')}\nיש לחדש קרדיטים ואז לנסות שוב.`);
           } else {
-            logGen('warning', 'הספקים מחוברים אבל היצירה לא אומתה — מנסה עם מנגנון גיבוי אוטומטי.');
+            // Providers are "authenticated" but not verified — try anyway with warning
             toast.warning('הספקים מחוברים אבל היצירה לא אומתה — מנסה עם מנגנון גיבוי אוטומטי.');
           }
         }
@@ -967,7 +942,6 @@ export function VideoWizardFlow({
         const msg = creditsErr?.message || '';
         if (msg.includes('חסומים') || msg.includes('אין קרדיטים')) throw creditsErr;
         console.warn('Credit check skipped:', msg);
-        logGen('info', 'בדיקת הספקים מתעכבת, ממשיכים לייצור עם מנגנון גיבוי אוטומטי.');
         toast.info('בדיקת הספקים מתעכבת, ממשיכים לייצור עם מנגנון גיבוי אוטומטי.');
       }
 
@@ -1000,11 +974,9 @@ export function VideoWizardFlow({
           addDebugLog(runId, 'narration', 'warn', `Voice clone failed: ${msg}`);
           console.warn('Voice clone failed, falling back to AI TTS:', msg);
           if (msg.includes('קובץ הקול לא נמצא')) {
-            logGen('error', 'קובץ הדגימה של הקול השמור לא נמצא. העלה/הקלט קול מחדש, בינתיים ממשיך עם קריין AI.');
             toast.error('קובץ הדגימה של הקול השמור לא נמצא. העלה/הקלט קול מחדש, בינתיים ממשיך עם קריין AI.');
             setSelectedVoiceIds(prev => prev.filter(id => id !== selectedVoice.id));
           } else {
-            logGen('warning', 'לא הצלחתי לשכפל את הקול, משתמש בקריין AI...');
             toast.info('לא הצלחתי לשכפל את הקול, משתמש בקריין AI...');
           }
         }
@@ -1116,7 +1088,6 @@ export function VideoWizardFlow({
             console.warn(`Scene ${sceneIdx + 1} Runway failed:`, msg);
             if (isRunwayCreditsErrorMessage(msg)) {
               runwayBlocked = true;
-              logGen('warning', 'Runway לא זמין, עובר לספק חלופי...');
               toast.warning('Runway לא זמין, עובר לספק חלופי...');
             }
           }
@@ -1159,7 +1130,6 @@ export function VideoWizardFlow({
           sceneErrors.push(`סצנה ${sceneNum}: ${errMsg}`);
           failedSceneIndexes.push(sceneIdx);
           console.error(`Scene ${sceneNum} all providers failed:`, errMsg);
-          logGen('error', `סצנה ${sceneNum} נכשלה — ${errMsg}`);
           toast.error(`סצנה ${sceneNum} נכשלה — ${errMsg}`);
         }
       }
@@ -1207,7 +1177,6 @@ export function VideoWizardFlow({
 
       if (successfulResults.length < sceneResults.length) {
         const missing = sceneResults.length - successfulResults.length;
-        logGen('warning', `${missing} סצנות לא הצליחו — ממשיך עם ${successfulResults.length} סצנות (${achievedDuration}s מתוך ${targetDurationSec}s).`);
         toast.warning(`${missing} סצנות לא הצליחו — ממשיך עם ${successfulResults.length} סצנות (${achievedDuration}s מתוך ${targetDurationSec}s).`);
       }
 
@@ -1223,33 +1192,18 @@ export function VideoWizardFlow({
       const brandColors = activeBrand?.colors || [];
 
       try {
-        // Strip heavy scene fields before sending to compose — reduce payload size
-        const leanScenes = finalScenes.map((s: any) => ({
-          duration: s.duration,
-          subtitleText: s.subtitleText || s.spokenText?.slice(0, 120) || '',
-          title: s.title || '',
-        }));
-
         const renderResult = await composeService.render({
           videoUrl: sceneVideoUrls[0],
           videoUrls: sceneVideoUrls,
-          scenes: leanScenes,
+          scenes: finalScenes,
           logoUrl,
           brandColors,
           audioUrl: narrationAudioUrl,
-          shotstackEnv: 'stage',
         });
 
         addDebugLog(runId, 'compose', renderResult?.renderId ? 'success' : 'error',
-          renderResult?.renderId
-            ? `Render started: ${renderResult.renderId} (${renderResult.shotstackEnv || 'unknown env'})`
-            : `Shotstack rejected render — status: ${renderResult?.status} | ${renderResult?.providerErrorDetail || 'no detail'}`
-        );
-        if (!renderResult?.renderId) {
-          const statusCode = renderResult?.status || 'unknown';
-          const detail = renderResult?.providerErrorDetail ? `\nפרטים: ${renderResult.providerErrorDetail}` : '';
-          throw new Error(`Shotstack דחה את הבקשה (${statusCode})${detail}`);
-        }
+          renderResult?.renderId ? `Render started: ${renderResult.renderId}` : 'No renderId returned');
+        if (!renderResult?.renderId) throw new Error('Shotstack error');
 
         const composeMaxAttempts = Math.max(240, sceneVideoUrls.length * 120);
         setProgressStage('מעבד וידאו סופי עם כתוביות ולוגו...');
@@ -1262,7 +1216,6 @@ export function VideoWizardFlow({
             // DURATION ENFORCEMENT: Verify output is within acceptable range
             if (totalDuration < minAcceptableDuration) {
               addDebugLog(runId, 'complete', 'warn', `Duration ${totalDuration}s below target ${targetDurationSec}s`, { outputUrl: status.url });
-              logGen('warning', `אזהרה: הסרטון (${totalDuration}s) קצר מהיעד (${targetDurationSec}s).`);
               toast.warning(`אזהרה: הסרטון (${totalDuration}s) קצר מהיעד (${targetDurationSec}s).`);
             }
 
@@ -1299,10 +1252,9 @@ export function VideoWizardFlow({
             toast.success(`🎬 סרטון של ${totalDuration} שניות מוכן!`);
             return;
           }
-          if (status.status === 'failed' || (status.status && status.status.startsWith('failed:'))) {
-            const detail = (status as any).providerErrorDetail ? ` — ${(status as any).providerErrorDetail}` : '';
-            addDebugLog(runId, 'compose', 'error', `Shotstack render failed: ${status.status}${detail}`);
-            throw new Error(`הרכבת הסרטון נכשלה ב-Shotstack${detail || ` (${status.status})`}`);
+          if (status.status === 'failed') {
+            addDebugLog(runId, 'compose', 'error', 'Shotstack render failed');
+            throw new Error('Shotstack render failed');
           }
           setRunwayProgress(70 + (i / composeMaxAttempts) * 28);
           await sleep(COMPOSE_STATUS_POLL_MS);
@@ -1315,7 +1267,7 @@ export function VideoWizardFlow({
         throw new Error(`שלב ההרכבה הסופית נכשל: ${composeErr?.message || 'שגיאה ב-Shotstack'}. לא ניתן להציג תוצר חלקי.`);
       }
     } catch (e: any) {
-      setVideoError(e.message || 'שגיאה ביצירת סרטון');
+      toast.error(e.message || 'שגיאה ביצירת סרטון');
       setStep(2);
       setProgressStage('');
     } finally {
@@ -1521,7 +1473,7 @@ export function VideoWizardFlow({
       setImprovePrompt('');
       toast.success('🎬 הסרטון המשופר מוכן!');
     } catch (e: any) {
-      setVideoError(e.message || 'שגיאה בשיפור הסרטון');
+      toast.error(e.message || 'שגיאה בשיפור הסרטון');
       setStep(4);
       setProgressStage('');
     } finally {
@@ -1591,62 +1543,6 @@ export function VideoWizardFlow({
 
   return (
     <div className="space-y-4">
-
-      {/* ===== Persistent Error Modal ===== */}
-      {videoError && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          dir="rtl"
-          onClick={(e) => { if (e.target === e.currentTarget) setVideoError(null); }}
-        >
-          <div className="bg-background border border-red-500/50 rounded-2xl shadow-2xl p-6 max-w-lg w-full space-y-4 animate-in fade-in-0 zoom-in-95">
-            {/* Header */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
-                  <X className="w-5 h-5 text-red-500" />
-                </div>
-                <h3 className="font-bold text-base text-red-500">שגיאה — יצירת סרטון נכשלה</h3>
-              </div>
-              <button
-                onClick={() => setVideoError(null)}
-                className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-muted transition-colors"
-              >
-                <X className="w-4 h-4 text-muted-foreground" />
-              </button>
-            </div>
-
-            {/* Error body */}
-            <div className="bg-muted/60 border border-border rounded-xl p-4 max-h-60 overflow-y-auto">
-              <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed font-mono">
-                {videoError}
-              </p>
-            </div>
-
-            {/* Hint */}
-            <p className="text-xs text-muted-foreground text-right">
-              💡 העתק את השגיאה ושלח לתמיכה טכנית, או נסה שוב
-            </p>
-
-            {/* Actions */}
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => { navigator.clipboard?.writeText(videoError).catch(() => {}); toast.success('הועתק!'); }}
-                className="px-3 py-2 text-xs border border-border rounded-lg hover:bg-muted transition-colors flex items-center gap-1.5"
-              >
-                📋 העתק שגיאה
-              </button>
-              <button
-                onClick={() => setVideoError(null)}
-                className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity font-medium"
-              >
-                סגור
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Progress */}
       <div className="flex items-center gap-1.5">
         {Array.from({ length: totalSteps }).map((_, i) => (
@@ -1774,41 +1670,10 @@ export function VideoWizardFlow({
             </div>
           </div>
 
-          {/* Scene count quick-selector */}
-          <div className="bg-card border border-border rounded-xl p-3 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              🎞️ מספר סצנות בסרטון
-            </p>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { scenes: 3, seconds: 30, label: '3 סצנות', sub: '~30 שניות' },
-                { scenes: 4, seconds: 40, label: '4 סצנות', sub: '~40 שניות' },
-                { scenes: 5, seconds: 50, label: '5 סצנות', sub: '~50 שניות' },
-                { scenes: 6, seconds: 60, label: '6 סצנות', sub: '~60 שניות' },
-              ].map(opt => {
-                const selected = Math.round(targetDurationSec / 10) === opt.scenes ||
-                  (opt.scenes === 6 && targetDurationSec >= 55 && targetDurationSec <= 65) ||
-                  (opt.scenes === 3 && targetDurationSec >= 25 && targetDurationSec <= 35) ||
-                  targetDurationSec === opt.seconds;
-                return (
-                  <button key={opt.scenes}
-                    onClick={() => setTargetDurationSec(opt.seconds)}
-                    className={cn(
-                      'text-center p-2.5 rounded-lg border text-xs transition-all',
-                      targetDurationSec === opt.seconds
-                        ? 'border-primary bg-primary/10 text-foreground shadow-sm font-semibold'
-                        : 'border-border hover:border-primary/30 text-muted-foreground'
-                    )}>
-                    <div className="font-medium text-sm">{opt.scenes}</div>
-                    <div className="text-[10px] mt-0.5 opacity-70">{opt.sub}</div>
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[10px] text-muted-foreground pt-0.5">
-              <Sparkles className="w-3 h-3 inline-block ml-1 text-primary" />
-              כל סצנה ~10 שניות. פחות סצנות = יצירה מהירה יותר + עלות נמוכה יותר.
-            </p>
+          {/* Info about duration */}
+          <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 text-xs text-muted-foreground flex items-start gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+            <span>הסרטון יהיה <strong className="text-foreground">{formatDuration(targetDurationSec)}</strong> (~{Math.round(targetDurationSec / 10)} סצנות). המערכת תוסיף קריינות בעברית, כתוביות, לוגו ואייקונים אוטומטית.</span>
           </div>
 
           {/* Avatars multi-select */}
@@ -1843,18 +1708,19 @@ export function VideoWizardFlow({
             </div>
           )}
 
-          {/* Voices multi-select — always show AI voice option */}
-          <div className="bg-card border border-border rounded-xl p-3 space-y-2">
-            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-              <Volume2 className="w-3.5 h-3.5" /> בחר קול
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setUseAiVoice(!useAiVoice)}
-                className={cn('px-3 py-1.5 rounded-lg border text-xs transition-all flex items-center gap-1.5',
-                  useAiVoice ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/30 text-muted-foreground')}>
-                <Sparkles className="w-3 h-3" /> קול AI אוטומטי (נתנאל)
-              </button>
-              {voices.length > 0 && voices.map(voice => {
+          {/* Voices multi-select */}
+          {voices.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Volume2 className="w-3.5 h-3.5" /> בחר קולות (ניתן לבחור כמה)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => setUseAiVoice(!useAiVoice)}
+                  className={cn('px-3 py-1.5 rounded-lg border text-xs transition-all flex items-center gap-1.5',
+                    useAiVoice ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:border-primary/30 text-muted-foreground')}>
+                  <Sparkles className="w-3 h-3" /> קול AI אוטומטי
+                </button>
+                {voices.map(voice => {
                   const selected = selectedVoiceIds.includes(voice.id);
                   return (
                     <button key={voice.id} onClick={() => toggleVoice(voice.id)}
@@ -1867,7 +1733,8 @@ export function VideoWizardFlow({
                   );
                 })}
               </div>
-          </div>
+            </div>
+          )}
 
           {/* Images */}
           <div className="bg-card border border-border rounded-xl p-3 space-y-2">
@@ -2205,24 +2072,7 @@ export function VideoWizardFlow({
           <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
             <div className="bg-gradient-to-r from-primary to-primary/70 h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${runwayProgress}%` }} />
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-            <span>{Math.round(runwayProgress)}% הושלם</span>
-            <span className="font-mono" dir="ltr">
-              {(() => {
-                const m = Math.floor(elapsedSeconds / 60);
-                const s = elapsedSeconds % 60;
-                const elapsedFmt = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-                if (runwayProgress < 30 || runwayProgress >= 95) {
-                  return `${elapsedFmt} עברו`;
-                }
-                const totalEst = Math.max((elapsedSeconds / runwayProgress) * 100, elapsedSeconds + 30);
-                const remaining = Math.max(0, Math.round(totalEst - elapsedSeconds));
-                const rm = Math.floor(remaining / 60);
-                const rs = remaining % 60;
-                return `${elapsedFmt} עברו · ~${String(rm).padStart(2, '0')}:${String(rs).padStart(2, '0')} נותר`;
-              })()}
-            </span>
-          </div>
+          <p className="text-xs text-muted-foreground">{Math.round(runwayProgress)}% הושלם</p>
           <div className="flex flex-wrap justify-center gap-2 pt-2">
             {[
               { label: 'בדיקת ספקים', done: runwayProgress > 5 },
@@ -2246,20 +2096,6 @@ export function VideoWizardFlow({
           )}
           {activeRunId && (
             <p className="text-[10px] text-muted-foreground/40 font-mono" dir="ltr">Run: {activeRunId}</p>
-          )}
-          {/* Persistent generation log */}
-          {generationLogs.length > 0 && (
-            <div className="text-right mt-3 space-y-1 max-h-32 overflow-y-auto border border-border rounded-lg p-2 bg-muted/40">
-              {generationLogs.map((log, i) => (
-                <p key={i} className={`text-[11px] leading-snug ${
-                  log.type === 'error' ? 'text-destructive' :
-                  log.type === 'warning' ? 'text-yellow-600 dark:text-yellow-400' :
-                  'text-muted-foreground'
-                }`}>
-                  {log.type === 'error' ? '✗' : log.type === 'warning' ? '⚠' : 'ℹ'} {log.msg}
-                </p>
-              ))}
-            </div>
           )}
           {/* Debug panel toggle */}
           <button onClick={() => setShowDebugPanel(!showDebugPanel)}

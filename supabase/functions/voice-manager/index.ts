@@ -440,14 +440,6 @@ Deno.serve(async (req) => {
 
       if (error) throw error;
 
-      // Persist provider_voice_id to voices table so it survives page refresh
-      if (status === "approved") {
-        await supabase
-          .from("voices")
-          .update({ provider_voice_id })
-          .eq("id", voice_id);
-      }
-
       return jsonResponse({
         success: true,
         verification: {

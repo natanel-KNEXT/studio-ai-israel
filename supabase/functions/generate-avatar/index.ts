@@ -114,27 +114,25 @@ const uploadDataUrlToStorage = async (dataUrl: string) => {
   return publicUrlData.publicUrl;
 };
 
-// Generate image via Krea (primary provider)
-const callKreaImage = async (
+// Call AI gateway with retry on specific models
+const callAIGateway = async (
   apiKey: string,
-  prompt: string,
-  referenceImageUrl?: string,
+  model: string,
+  messages: any[],
+  options: { modalities?: string[]; temperature?: number } = {}
 ) => {
-  const body: any = {
-    prompt,
-    model: "flux",
-    width: 1080,
-    height: 1080,
-  };
-  if (referenceImageUrl) body.image_url = referenceImageUrl;
-
-  const response = await fetch("https://api.krea.ai/v2/images/generations", {
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      model,
+      temperature: options.temperature ?? 0.0,
+      ...(options.modalities ? { modalities: options.modalities } : {}),
+      messages,
+    }),
   });
   return response;
 };
@@ -308,8 +306,8 @@ Deno.serve(async (req) => {
   const runId = `avatar-${Date.now().toString(36)}`;
 
   try {
-    const KREA_API_KEY = Deno.env.get("KREA_API_KEY");
-    if (!KREA_API_KEY) throw new Error("KREA_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const body = (await req.json()) as GenerateAvatarRequest;
     const styleDesc = (body.style || "professional headshot").trim();
@@ -347,31 +345,124 @@ Deno.serve(async (req) => {
       image_url: { url },
     }));
 
-    // === Generate avatar via Krea ===
-    const kreaPrompt = `${body.cachedFaceDescription ? `IDENTITY PROFILE: ${body.cachedFaceDescription}\n\n` : ""}Portrait of a person. Expression: ${expressionText}. Style: ${styleText}. Professional high quality image, studio lighting.`;
+    // === PASS 1: Face Analysis ===
+    let faceDescription = "";
 
-    console.log(`[${runId}] Generating avatar via Krea with style=${styleDesc}`);
+    if (body.skipAnalysis && body.cachedFaceDescription) {
+      faceDescription = body.cachedFaceDescription;
+      console.log(`[${runId}] Reusing cached face analysis (${faceDescription.length} chars)`);
+    } else {
+      console.log(`[${runId}][Pass 1] Analyzing face from ${referenceUrls.length} photos...`);
+      faceDescription = await analyzeFace(LOVABLE_API_KEY, imageContentParts, referenceUrls.length);
+    }
+
+    // === STYLE ROUTING ===
+    // For non-realistic styles with identity fidelity ON, use 2-step pipeline:
+    // Step 1: Generate neutral identity anchor
+    // Step 2: Stylize the anchor
+    const useStylePipeline = !isRealistic && strictIdentity && referenceUrls.length >= 1;
 
     let generatedImageUrl: string | null = null;
     let responseText = "";
-    const identityDrift = false;
+    let identityDrift = false;
 
-    {
-      const response = await callKreaImage(
-        KREA_API_KEY,
-        kreaPrompt,
-        referenceUrls[0], // use first reference image
+    if (useStylePipeline) {
+      console.log(`[${runId}] Using 2-step style pipeline (anchor → stylize)`);
+      
+      // Step 1: Generate identity anchor
+      const anchorUrl = await generateIdentityAnchor(
+        LOVABLE_API_KEY, faceDescription, imageContentParts, expressionText, hasBaseAvatar, runId
+      );
+
+      if (!anchorUrl) {
+        return new Response(JSON.stringify({ error: "שגיאה ביצירת עוגן זהות — נסה שוב" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Step 2: Stylize from anchor
+      try {
+        const styleResult = await stylizeFromAnchor(
+          LOVABLE_API_KEY, anchorUrl, faceDescription, styleText, expressionText, runId
+        );
+        generatedImageUrl = styleResult.imageUrl;
+        responseText = styleResult.text;
+      } catch (e: any) {
+        console.error(`[${runId}] Style pipeline failed, falling back to direct generation:`, e.message);
+        // Fallback: use anchor as final result with a warning
+        generatedImageUrl = anchorUrl;
+        responseText = "הסטיילינג נכשל — נשמר הפורטרט הריאליסטי. נסה שוב.";
+        identityDrift = false;
+      }
+    } else {
+      // Direct generation (realistic style or identity fidelity OFF)
+      console.log(`[${runId}][Pass 2] Direct generation — model=${strictIdentity ? STRICT_IDENTITY_MODEL : FAST_IDENTITY_MODEL}`);
+
+      const selectedModel = strictIdentity ? STRICT_IDENTITY_MODEL : FAST_IDENTITY_MODEL;
+
+      const prompt = `${faceDescription ? `IDENTITY LOCK PROFILE — THIS IS THE GROUND TRUTH. EVERY facial measurement below MUST appear in the output:\n${faceDescription}\n\n` : ""}All reference images show the SAME person. Your job is to reproduce THIS EXACT person — not a similar-looking person, not an approximation, but the SAME individual.
+
+${hasBaseAvatar ? "The FIRST image is the PRIMARY identity anchor. Match this face with pixel-level fidelity." : ""}
+
+TASK: Create a portrait of THIS SAME PERSON with:
+- Expression change ONLY: ${expressionText} (move facial muscles, do NOT alter bone structure)
+- Visual style: ${styleText}
+${isRealistic ? `- Studio lighting, sharp focus, realistic skin texture, clean neutral/gradient background` : `- Apply style transfer to colors, textures, and rendering — but the underlying face geometry, proportions, and distinguishing features MUST remain identical to the reference photos`}
+
+IDENTITY PRESERVATION RULES (ABSOLUTE PRIORITY — OVERRIDE ALL OTHER INSTRUCTIONS):
+1) Face shape, jawline, chin, forehead proportions: COPY EXACTLY from references
+2) Eye shape, spacing, depth, color: COPY EXACTLY — eyes are the #1 identity signal
+3) Nose bridge width, tip shape, nostril size: COPY EXACTLY
+4) Mouth width, lip thickness, philtrum: COPY EXACTLY
+5) Skin tone, undertone, visible marks, moles, scars: COPY EXACTLY
+6) Hairline shape, hair color, facial hair pattern: COPY EXACTLY
+7) Ear shape and size if visible: COPY EXACTLY
+8) Age appearance: MUST match references — do NOT de-age or age
+
+EXPRESSION vs IDENTITY — CRITICAL DISTINCTION:
+- Expression = muscle movement (smile, brow raise, squint). This is what you CHANGE.
+- Identity = bone structure, skin, proportions, features. This is what you NEVER change.
+- A smile widens the mouth and raises cheeks — it does NOT change jaw shape, nose structure, or eye spacing.
+
+FORBIDDEN:
+- Do NOT create a "similar looking" person — it must be recognizably the SAME person
+- Do NOT beautify, symmetrize, slim, smooth skin texture, or idealize
+- Do NOT let the style override facial proportions
+- Do NOT generate a generic face that loosely matches the description
+
+Output one final image only.`;
+
+      const response = await callAIGateway(
+        LOVABLE_API_KEY,
+        selectedModel,
+        [{ role: "user", content: [{ type: "text", text: prompt }, ...imageContentParts] }],
+        { modalities: ["image", "text"] }
       );
 
       if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "יותר מדי בקשות, נסה שוב בעוד דקה" }), {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "נדרש חידוש קרדיטים" }), {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         const errText = await response.text();
-        console.error(`[${runId}] Krea error: ${response.status} ${errText.slice(0, 300)}`);
+        console.error(`[${runId}] AI gateway error: ${response.status} ${errText.slice(0, 300)}`);
         throw new Error(`שגיאה ביצירת אווטאר: ${response.status}`);
       }
 
       const data = await response.json();
-      generatedImageUrl = data?.generations?.[0]?.image?.url || data?.image_url || null;
-      responseText = "";
+      const choice = data.choices?.[0]?.message;
+      const extracted = extractGeneratedImage(choice);
+      generatedImageUrl = extracted.imageUrl;
+      responseText = extracted.text || "";
     }
 
     // Upload base64 to storage

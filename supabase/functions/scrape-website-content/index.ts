@@ -130,9 +130,10 @@ Deno.serve(async (req) => {
     // Truncate markdown to prevent excessive AI costs
     const truncatedMarkdown = markdown.slice(0, 8000);
 
-    // Step 2: Extract structured content via Claude AI
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) {
+    // Step 2: Extract structured content via AI
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      // Return raw scrape data without AI extraction
       return new Response(JSON.stringify({
         success: true,
         brand: branding ? {
@@ -170,25 +171,26 @@ OG Description: ${metadata.ogDescription || metadata['og:description'] || 'N/A'}
 Website content (markdown):
 ${truncatedMarkdown}`;
 
-    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
+    const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system: 'You are a marketing content extractor. Return ONLY valid JSON, no markdown fences, no explanation.',
-        messages: [{ role: 'user', content: extractionPrompt }],
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'system', content: 'You are a marketing content extractor. Return ONLY valid JSON, no markdown fences, no explanation.' },
+          { role: 'user', content: extractionPrompt },
+        ],
       }),
     });
 
     let content = null;
     if (aiRes.ok) {
       const aiData = await aiRes.json();
-      const rawText = aiData.content?.[0]?.text || '';
+      const rawText = aiData.choices?.[0]?.message?.content || '';
+      // Strip markdown fences if present
       const cleaned = rawText.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
       try {
         content = JSON.parse(cleaned);

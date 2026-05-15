@@ -617,8 +617,8 @@ export default function VoicesManagePage() {
     if (!scriptText.trim()) { toast.error('יש להזין תסריט'); return; }
     if (scriptText.length > 4500) { toast.error('התסריט ארוך מדי (מקסימום 4,500 תווים)'); return; }
     if (!scriptTitle.trim()) { toast.error('יש להזין כותרת לדיבוב'); return; }
-    if (!selectedVoice?.provider_voice_id) {
-      toast.error('יש לשכפל את הקול תחילה — לחץ "איפוס / שכפול קול".');
+    if (!selectedVoice?.provider_voice_id || !selectedVoice.is_verified) {
+      toast.error('הקול לא מאומת. לחץ "אמת את הקול" לפני יצירת דיבוב.');
       return;
     }
 
@@ -630,8 +630,8 @@ export default function VoicesManagePage() {
   const executeGenerate = async () => {
     setCostApprovalOpen(false);
     if (!selectedVoice) return;
-    if (!selectedVoice.provider_voice_id) {
-      toast.error('יש לשכפל את הקול תחילה.');
+    if (!selectedVoice.provider_voice_id || !selectedVoice.is_verified) {
+      toast.error('הקול לא מאומת. יש להשלים אימות תחילה.');
       return;
     }
 

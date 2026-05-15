@@ -7,16 +7,12 @@ const corsHeaders = {
 const HEBREW_WARNING = "הקול שנבחר לא תומך בעברית בצורה טובה. בחר קול אחר או שנה הגדרות.";
 
 const languageConfig = {
-  he: { languageCode: "he", modelId: "eleven_multilingual_v2", omitLanguageCode: true },
-  en: { languageCode: "en", modelId: "eleven_multilingual_v2", omitLanguageCode: false },
-  ar: { languageCode: "ar", modelId: "eleven_multilingual_v2", omitLanguageCode: false },
+  he: { languageCode: "he", modelId: "eleven_v3" },
+  en: { languageCode: "en", modelId: "eleven_multilingual_v2" },
+  ar: { languageCode: "ar", modelId: "eleven_multilingual_v2" },
 } as const;
 
-// Fallback model order — tried if primary model fails with auth/perm error
-const FALLBACK_MODELS = ["eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_turbo_v2"] as const;
-
 type SupportedLanguage = keyof typeof languageConfig;
-type LanguageConfig = { languageCode: string; modelId: string; omitLanguageCode: boolean };
 
 const resolveLanguage = (text: string, requestedLanguage?: string): SupportedLanguage => {
   if (/[\u0590-\u05FF]/.test(text)) return "he";
@@ -111,63 +107,29 @@ Deno.serve(async (req) => {
       });
     }
 
-    const buildPayload = (modelId: string, langCode: string, omitLang: boolean) => {
-      const base: Record<string, unknown> = {
-        text,
-        model_id: modelId,
-        voice_settings: {
-          stability: 0.45,
-          similarity_boost: 0.85,
-          use_speaker_boost: true,
-        },
-      };
-      if (!omitLang) base.language_code = langCode;
-      return base;
+    const payload = {
+      text,
+      model_id: selectedConfig.modelId,
+      language_code: selectedConfig.languageCode,
+      voice_settings: {
+        stability: 0.45,
+        similarity_boost: 0.85,
+        use_speaker_boost: true,
+        speed: 1,
+      },
     };
 
-    const ttsUrl = `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}?output_format=mp3_44100_128`;
-    const ttsHeaders = { "xi-api-key": ELEVENLABS_API_KEY, "Content-Type": "application/json" };
-
-    // First attempt with configured model
-    let response = await fetch(ttsUrl, {
-      method: "POST",
-      headers: ttsHeaders,
-      body: JSON.stringify(buildPayload(selectedConfig.modelId, selectedConfig.languageCode, selectedConfig.omitLanguageCode)),
-    });
-
-    // If auth/perm/bad-request error, retry with fallback models
-    if (!response.ok && [400, 401, 403, 422].includes(response.status)) {
-      const firstStatus = response.status;
-      const firstBody = await response.text();
-      console.warn(`ElevenLabs primary model ${selectedConfig.modelId} failed (${firstStatus}): ${firstBody}. Retrying with fallbacks...`);
-
-      let retried = false;
-      for (const fallbackModel of FALLBACK_MODELS) {
-        if (fallbackModel === selectedConfig.modelId) continue;
-        console.log(`Trying fallback model: ${fallbackModel}`);
-        const fbResponse = await fetch(ttsUrl, {
-          method: "POST",
-          headers: ttsHeaders,
-          body: JSON.stringify(buildPayload(fallbackModel, selectedConfig.languageCode, fallbackModel === "eleven_multilingual_v2")),
-        });
-        if (fbResponse.ok) {
-          response = fbResponse;
-          retried = true;
-          console.log(`Fallback model ${fallbackModel} succeeded!`);
-          break;
-        }
-        console.warn(`Fallback model ${fallbackModel} also failed: ${fbResponse.status}`);
+    const response = await fetch(
+      `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: {
+          "xi-api-key": ELEVENLABS_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       }
-      // If all fallbacks failed too, restore the original failed response for error reporting
-      if (!retried) {
-        // Re-issue original request to get a fresh response object for error reporting
-        response = await fetch(ttsUrl, {
-          method: "POST",
-          headers: ttsHeaders,
-          body: JSON.stringify(buildPayload(selectedConfig.modelId, selectedConfig.languageCode, selectedConfig.omitLanguageCode)),
-        });
-      }
-    }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -181,14 +143,9 @@ Deno.serve(async (req) => {
         typeof (providerError as { detail?: { status?: string } }).detail?.status === "string" &&
         (providerError as { detail?: { status?: string } }).detail?.status === "unsupported_language";
 
-      // Build a detailed error message that includes the provider's response
-      const providerDetail = typeof providerError === "string"
-        ? providerError.slice(0, 300)
-        : JSON.stringify(providerError).slice(0, 300);
-
       return providerErrorResponse({
         status: response.status,
-        error: unsupportedLanguage ? HEBREW_WARNING : `שגיאה ביצירת קול (${response.status}): ${providerDetail}`,
+        error: unsupportedLanguage ? HEBREW_WARNING : `שגיאה ביצירת קול (${response.status})`,
         providerError,
         modelId: selectedConfig.modelId,
         language: selectedConfig.languageCode,
