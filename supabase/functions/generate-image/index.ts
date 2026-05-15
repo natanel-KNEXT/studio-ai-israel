@@ -104,32 +104,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Use Krea as primary image generation provider
-    console.log("Generating image via Krea");
-    const kreaRes = await fetch("https://api.krea.ai/v2/images/generations", {
+    // Use Lovable AI Gateway (Nano Banana) as primary image generation provider
+    console.log("Generating image via Lovable AI Gateway (Nano Banana)");
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: { Authorization: `Bearer ${KREA_API_KEY_PRIMARY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        prompt: prompt || "Professional high quality image",
-        model: "flux",
-        width: aspectRatio === "9:16" ? 720 : aspectRatio === "1:1" ? 1080 : 1280,
-        height: aspectRatio === "9:16" ? 1280 : aspectRatio === "1:1" ? 1080 : 720,
-        ...(imageUrl ? { image_url: imageUrl } : {}),
+        model: "google/gemini-2.5-flash-image",
+        messages,
+        modalities: ["image", "text"],
       }),
     });
 
-    if (!kreaRes.ok) {
-      const errRaw = await kreaRes.text();
-      console.error("Krea image generation failed:", kreaRes.status, errRaw.slice(0, 300));
-      return new Response(JSON.stringify({ error: "שגיאה בשירות יצירת התמונות (Krea)" }), {
-        status: 500,
+    if (!aiRes.ok) {
+      const errRaw = await aiRes.text();
+      console.error("Lovable AI image generation failed:", aiRes.status, errRaw.slice(0, 500));
+      const friendly = aiRes.status === 429
+        ? "חרגנו ממגבלת הקצב של שירות התמונות, נסה שוב בעוד רגע"
+        : aiRes.status === 402
+          ? "נגמרו הקרדיטים בשירות יצירת התמונות (Lovable AI)"
+          : `שגיאה בשירות יצירת התמונות: ${extractGatewayMessage(errRaw)}`;
+      return new Response(JSON.stringify({ error: friendly }), {
+        status: aiRes.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const kreaData = await kreaRes.json();
-    const imageData = kreaData?.generations?.[0]?.image?.url || kreaData?.image_url;
-    const text = "";
+    const aiData = await aiRes.json();
+    const imageData = aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const text = aiData?.choices?.[0]?.message?.content || "";
 
     if (!imageData) {
       return new Response(JSON.stringify({ error: "לא הצלחתי ליצור תמונה, נסה תיאור אחר", text }), {
