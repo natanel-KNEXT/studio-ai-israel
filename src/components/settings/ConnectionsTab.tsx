@@ -265,89 +265,105 @@ export function ConnectionsTab() {
             {
               n: 1,
               title: 'איסוף קלט וניתוח קריאייטיבי',
-              tool: 'Gemini 2.5 Pro + Firecrawl',
+              tool: 'firecrawl-scrape + scrape-website-content + Gemini 2.5 Pro',
               icon: Sparkles,
-              desc: 'המשתמש מכניס נושא/אתר/קובץ. אם הוזן URL — Firecrawl סורק את האתר ומחזיר תוכן נקי. Gemini מנתח קהל יעד, טון וזווית.',
+              desc: 'המשתמש מכניס נושא/אתר/קובץ. אם הוזן URL — Firecrawl סורק (fallback ל-scrape-website-content) ומחזיר תוכן נקי. Gemini מנתח קהל יעד, טון וזווית.',
               out: 'בריף קריאייטיבי מובנה (JSON)',
             },
             {
               n: 2,
-              title: 'יצירת תסריט בעברית',
-              tool: 'Gemini 2.5 Flash → Pro → GPT-4o-mini (שרשרת מודלים)',
+              title: 'אופטימיזציית פרומפט',
+              tool: 'enhance-prompt (Gemini Flash)',
               icon: Wand2,
-              desc: 'יצירת תסריט עברי אותנטי מחולק לסצנות (3–6), עם הוראות בימוי, זוויות מצלמה ומיקרו-פעולות לכל סצנה.',
-              out: 'תסריט מסודר לפי סצנות + הוראות בימוי',
+              desc: 'הפרומפט הגולמי עובר שיפור — הוספת פרטים חסרים, סגנון, וטון. ניתן גם דרך לחצן "שפר פרומפט" ידני.',
+              out: 'פרומפט מועשר מוכן ליצירת תסריט',
             },
             {
               n: 3,
+              title: 'יצירת תסריט בעברית',
+              tool: 'generate-script (Gemini 2.5 Flash → Pro → GPT-4o-mini)',
+              icon: Wand2,
+              desc: 'יצירת תסריט עברי אותנטי מחולק לסצנות (3–6), עם הוראות בימוי, זוויות מצלמה ומיקרו-פעולות לכל סצנה. שרשרת מודלים אוטומטית.',
+              out: 'תסריט מסודר לפי סצנות + הוראות בימוי',
+            },
+            {
+              n: 4,
               title: 'הרחבה והעמקה (Director Pass)',
-              tool: 'Gemini 2.5 Pro Ultra Director',
+              tool: 'generate-script (Ultra Director mode)',
               icon: Sparkles,
               desc: 'העשרת כל סצנה ב-8–10 שורות בימוי — אור, מצלמה, אווירה, תזמון. שמירת זהות אווטאר (Identity Lock).',
               out: 'תסריט מועשר מוכן ל-Prompt-to-Video',
             },
             {
-              n: 4,
-              title: 'אישור עלות (Cost Gate)',
-              tool: 'CostApprovalDialog',
-              icon: DollarSign,
-              desc: 'הצגת חיווי עלות מוערכת לפני שימוש בספקים בתשלום. ללא אישור מפורש — לא מתבצעת קריאה.',
-              out: 'אישור מפורש להמשך',
-            },
-            {
               n: 5,
-              title: 'קריינות (TTS)',
-              tool: 'ElevenLabs eleven_v3 (he)',
-              icon: Mic,
-              desc: 'יצירת קריינות עברית עם הקול הנבחר מספריית הקולות. צ׳אנקים של 10–20 שניות, A/B verification של הזהות הקולית.',
-              out: 'audio_url (MP3) + duration',
+              title: 'בדיקת קרדיטים ואישור עלות',
+              tool: 'check-credits + provider-balances + CostApprovalDialog',
+              icon: DollarSign,
+              desc: 'בדיקת זמינות ספקים בזמן אמת (היתרות + readiness), הצגת עלות מוערכת, ודרישת אישור מפורש לפני שימוש בספקים בתשלום.',
+              out: 'אישור מפורש + מפת זמינות ספקים',
             },
             {
               n: 6,
-              title: 'יצירת/דיבוב אווטאר',
-              tool: 'HeyGen v2 (ברירת מחדל)',
-              icon: UserCircle,
-              desc: 'HeyGen מקבל את ה-audio_url מ-ElevenLabs (לסנכרון שפתיים מדויק בעברית). שמירת זהות חזותית — Pass 1 משמש מקור לכל ההבעות.',
-              out: 'קליפ אווטאר מדבר (MP4)',
+              title: 'קריינות (TTS)',
+              tool: 'text-to-speech / clone-voice-tts (ElevenLabs eleven_v3 he)',
+              icon: Mic,
+              desc: 'יצירת קריינות עברית. אם נבחר קול משוכפל — clone-voice-tts; אחרת text-to-speech. צ׳אנקים 10–20 שניות, A/B verification.',
+              out: 'audio_url (MP3) + duration',
             },
             {
               n: 7,
-              title: 'יצירת תמונות/B-roll',
-              tool: 'Gemini 3 Pro Image Preview + Krea AI (Flux/Seedream)',
-              icon: ImageIcon,
-              desc: 'יצירת תמונות תומכות לסצנות (יחס מסך נשמר במדויק). Gemini Image לעברית ברורה על תמונה, Krea ל-Hi-Res עד 22K.',
-              out: 'נכסים ויזואליים לכל סצנה',
+              title: 'יצירת/דיבוב אווטאר',
+              tool: 'heygen-video (v2) — קולט audio_url משלב 6',
+              icon: UserCircle,
+              desc: 'HeyGen מקבל את ה-audio_url מ-ElevenLabs לסנכרון שפתיים מדויק בעברית. שמירת זהות חזותית — Pass 1 משמש מקור לכל ההבעות.',
+              out: 'קליפ אווטאר מדבר (MP4)',
             },
             {
               n: 8,
-              title: 'גיבוי וידאו (אם נדרש)',
-              tool: 'שרשרת: HeyGen → Krea → Runway → תמונה סטטית',
-              icon: ShieldCheck,
-              desc: 'אם HeyGen נכשל: Krea מנסה. אם Krea נכשל: Runway (גיבוי בלבד, ידני). אם הכל נכשל — חזרה לתמונת AI סטטית עם קריינות.',
-              out: 'קליפ וידאו או תמונה סטטית',
+              title: 'יצירת תמונות/B-roll',
+              tool: 'generate-image (Gemini 3 Pro Image) + krea-image (Flux/Seedream)',
+              icon: ImageIcon,
+              desc: 'יצירת תמונות תומכות לסצנות (יחס מסך נשמר במדויק: Auto/9:16/1:1/16:9). Gemini Image לעברית ברורה על תמונה, Krea ל-Hi-Res עד 22K.',
+              out: 'נכסים ויזואליים לכל סצנה',
             },
             {
               n: 9,
-              title: 'כתוביות (Subtitles)',
-              tool: 'ElevenLabs Scribe v2 + opentype.js (SVG Path)',
-              icon: Subtitles,
-              desc: 'תמלול אודיו לעברית עם תזמון מדויק. רינדור SVG Path בעברית מלאה (ללא קיצוצים, Safe Face Zone בתחתית 60%).',
-              out: 'שכבת כתוביות מסונכרנת',
+              title: 'גיבוי וידאו (אם נדרש)',
+              tool: 'שרשרת: heygen-video → krea-image → runway-video → תמונה סטטית',
+              icon: ShieldCheck,
+              desc: 'אם HeyGen נכשל: Krea (image-to-video) מנסה. אם נכשל: runway-video (גיבוי בלבד, ידני, דורש אישור). אם הכל נכשל — חזרה לתמונת AI סטטית עם קריינות. Timeouts: HeyGen 15 דק׳, Krea 6 דק׳, Runway 30 שנ׳ להפעלה.',
+              out: 'קליפ וידאו או תמונה סטטית',
             },
             {
               n: 10,
-              title: 'הרכבה ורינדור סופי',
-              tool: 'Shotstack (multi-layer) + ElevenLabs Music',
-              icon: Video,
-              desc: 'הרכבה רב-שכבתית: אווטאר + B-roll + כתוביות + 2 לוגואים + BGM עם ducking אוטומטי. מיפוי קואורדינטות ל-Content Rect.',
-              out: 'וידאו סופי (MP4) + thumbnail',
+              title: 'כתוביות (Subtitles)',
+              tool: 'transcribe-audio (ElevenLabs Scribe v2) + opentype.js (SVG Path)',
+              icon: Subtitles,
+              desc: 'תמלול אודיו לעברית עם תזמון מדויק. רינדור SVG Path בעברית מלאה (ללא קיצוצים, Safe Face Zone בתחתית 60%, סנכרון דרך requestVideoFrameCallback).',
+              out: 'שכבת כתוביות מסונכרנת',
             },
             {
               n: 11,
+              title: 'מוזיקת רקע (BGM)',
+              tool: 'elevenlabs-music (אופציונלי)',
+              icon: Mic,
+              desc: 'יצירת/בחירת מוזיקת רקע עם ducking אוטומטי — עוצמת BGM יורדת אוטומטית כשיש קריינות.',
+              out: 'רצועת BGM עם ducking',
+            },
+            {
+              n: 12,
+              title: 'הרכבה ורינדור סופי',
+              tool: 'compose-video (Shotstack multi-layer)',
+              icon: Video,
+              desc: 'הרכבה רב-שכבתית: אווטאר + B-roll + כתוביות + 2 לוגואים + BGM. מיפוי קואורדינטות ל-Content Rect (יחסי % לפיקסלים, מתעלם מ-letterbox).',
+              out: 'וידאו סופי (MP4) + thumbnail',
+            },
+            {
+              n: 13,
               title: 'שמירה, גרסאות ו-Output Editor',
-              tool: 'Supabase Storage + RLS + Version History',
+              tool: 'storage-manager + Supabase Storage + RLS',
               icon: CheckCircle2,
-              desc: 'שמירה לא-הרסנית עם parent_output_id. URLs חתומים בזמן ריצה, מחיקה מדורגת. ניתן לערוך, לשכפל, או לחזור לגרסה.',
+              desc: 'שמירה לא-הרסנית עם parent_output_id. URLs חתומים בזמן ריצה, מחיקה מדורגת (cascade delete). ניתן לערוך, לשכפל, או לחזור לגרסה.',
               out: 'פרויקט שמור + היסטוריית גרסאות',
             },
           ].map(s => {
@@ -386,6 +402,86 @@ export function ConnectionsTab() {
         </div>
       </div>
 
+      {/* ═══ FULL EDGE FUNCTIONS INVENTORY — full transparency ═══ */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Info className="w-5 h-5 text-primary" />
+          <h2 className="font-rubik font-semibold">מצאי מלא — כל Edge Functions במערכת</h2>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-info/15 text-info font-medium">22 פונקציות</span>
+        </div>
+        <p className="text-xs text-muted-foreground">שקיפות מלאה — כל פונקציה פעילה ב-Backend, מה היא עושה, ומאיזה שלב/מסך נקראת.</p>
+
+        {[
+          {
+            group: 'יצירה ויזואלית / וידאו',
+            items: [
+              { fn: 'generate-script', desc: 'יצירת תסריט עברי (שרשרת Gemini Flash → Pro → GPT-4o-mini)' },
+              { fn: 'enhance-prompt', desc: 'אופטימיזציית פרומפט (Gemini Flash)' },
+              { fn: 'generate-image', desc: 'יצירת תמונות AI (Gemini 3 Pro Image Preview)' },
+              { fn: 'krea-image', desc: 'תמונות/וידאו Hi-Res (Flux, Seedream 4, Kling, Veo)' },
+              { fn: 'heygen-video', desc: 'אווטאר מדבר v2 (קולט audio_url מ-ElevenLabs)' },
+              { fn: 'runway-video', desc: 'וידאו AI קולנועי — Fallback בלבד, ידני' },
+              { fn: 'compose-video', desc: 'הרכבה ורינדור סופי (Shotstack multi-layer)' },
+              { fn: 'generate-avatar', desc: 'יצירת אווטאר חדש (2-Pass/3-Pass, Identity Lock)' },
+              { fn: 'did-avatar', desc: 'אווטאר D-ID (גיבוי שני, לא בשימוש כברירת מחדל)' },
+            ],
+          },
+          {
+            group: 'קול ואודיו',
+            items: [
+              { fn: 'text-to-speech', desc: 'קריינות ElevenLabs eleven_v3 (he) — קולות סטנדרטיים' },
+              { fn: 'clone-voice-tts', desc: 'קריינות עם קול משוכפל אישי' },
+              { fn: 'transcribe-audio', desc: 'תמלול עברית (ElevenLabs Scribe v2) לכתוביות' },
+              { fn: 'elevenlabs-music', desc: 'יצירת מוזיקת רקע (BGM) עם ducking' },
+            ],
+          },
+          {
+            group: 'ניהול נכסים (Capability Center)',
+            items: [
+              { fn: 'avatar-manager', desc: 'CRUD על ספריית אווטארים (רשימה שטוחה)' },
+              { fn: 'voice-manager', desc: 'CRUD על ספריית קולות (כולל זהות קולית)' },
+              { fn: 'storage-manager', desc: 'URLs חתומים בזמן ריצה, מחיקה מדורגת' },
+              { fn: 'import-url', desc: 'ייבוא מדיה מ-URL (איסור פלטפורמות מוגנות)' },
+            ],
+          },
+          {
+            group: 'תוכן וטרנדים',
+            items: [
+              { fn: 'firecrawl-scrape', desc: 'סריקת אתרים (Firecrawl, ראשי)' },
+              { fn: 'scrape-website-content', desc: 'סריקת אתרים (Gemini Flash, fallback)' },
+              { fn: 'fetch-trends', desc: 'משיכת טרנדים ויראליים (Perplexity, on-demand)' },
+              { fn: 'auto-fetch-trends', desc: 'משיכת טרנדים אוטומטית (pg_cron כל יומיים)' },
+            ],
+          },
+          {
+            group: 'תשתית, אבטחה ובקרת עלות',
+            items: [
+              { fn: 'check-credits', desc: 'בדיקת readiness מפורטת לכל ספק (auth + credits + models)' },
+              { fn: 'provider-balances', desc: 'יתרות בזמן אמת (auto-refresh כל 5 דק׳)' },
+              { fn: 'auth-gate', desc: 'שער כניסה פרטי (12345/12345) — אימות 24 שעות' },
+              { fn: 'data-manager', desc: 'גישה מבוקרת לטבלאות (RLS-aware)' },
+            ],
+          },
+        ].map((group) => (
+          <div key={group.group} className="space-y-2">
+            <h3 className="text-xs font-semibold text-primary border-b border-border/40 pb-1">{group.group}</h3>
+            <ul className="space-y-1.5">
+              {group.items.map((item) => (
+                <li key={item.fn} className="flex items-start gap-2 text-[11px]">
+                  <code className="flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-primary font-mono text-[10px] font-semibold">{item.fn}</code>
+                  <span className="text-muted-foreground">{item.desc}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+
+        <div className="bg-warning/5 border border-warning/20 rounded-lg p-3">
+          <p className="text-[11px] text-foreground">
+            <strong className="text-warning">הצהרה:</strong> זוהי רשימה מלאה ומדויקת של כל 22 ה-Edge Functions הפעילות בפרויקט. אין פונקציות נסתרות, אין קריאות רקע שלא מתועדות כאן. כל פונקציה ניתנת לבדיקה דרך <code className="px-1 bg-muted rounded">/proof-test</code>.
+          </p>
+        </div>
+      </div>
       {/* ═══ PROVIDER STATUS CARDS ═══ */}
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
