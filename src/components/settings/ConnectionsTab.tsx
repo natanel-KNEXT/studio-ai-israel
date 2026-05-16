@@ -460,61 +460,69 @@ export function ConnectionsTab() {
           {
             group: 'יצירה ויזואלית / וידאו',
             items: [
-              { fn: 'generate-script', desc: 'יצירת תסריט עברי (שרשרת Gemini Flash → Pro → GPT-4o-mini)' },
-              { fn: 'enhance-prompt', desc: 'אופטימיזציית פרומפט (Gemini Flash)' },
-              { fn: 'generate-image', desc: 'יצירת תמונות AI (Gemini 3 Pro Image Preview)' },
-              { fn: 'krea-image', desc: 'תמונות/וידאו Hi-Res (Flux, Seedream 4, Kling, Veo)' },
-              { fn: 'heygen-video', desc: 'אווטאר מדבר v2 (קולט audio_url מ-ElevenLabs)' },
-              { fn: 'runway-video', desc: 'וידאו AI קולנועי — Fallback בלבד, ידני' },
-              { fn: 'compose-video', desc: 'הרכבה ורינדור סופי (Shotstack multi-layer)' },
-              { fn: 'generate-avatar', desc: 'יצירת אווטאר חדש (2-Pass/3-Pass, Identity Lock)' },
-              { fn: 'did-avatar', desc: 'אווטאר D-ID (גיבוי שני, לא בשימוש כברירת מחדל)' },
+              { fn: 'generate-script', actions: 'POST { topic, scenes, duration, aspect_ratio }', desc: 'יצירת תסריט עברי מובנה לסצנות עם הוראות בימוי.', models: 'google/gemini-2.5-flash → google/gemini-2.5-pro → openai/gpt-4o-mini', returns: '{ scenes: [{title, spokenText, visualDescription, duration}] }', notes: 'שרשרת מודלים אוטומטית. אכיפת משך מצטבר. תמיכת RTL מלאה.' },
+              { fn: 'enhance-prompt', actions: 'POST { prompt, context }', desc: 'אופטימיזציה של פרומפט המשתמש לפני שימוש במודלים.', models: 'Gemini Flash → Pro → GPT-4o-mini', returns: '{ enhanced_prompt }', notes: 'נקרא ידנית דרך "שפר פרומפט" או אוטומטית בשלב 2 של ה-pipeline.' },
+              { fn: 'generate-image', actions: 'POST { prompt, action: "generate"|"edit", imageUrl?, referenceImages?, aspectRatio }', desc: 'יצירת/עריכת תמונות AI עם תמיכה ביחס מסך מפורש.', models: 'google/gemini-3-pro-image-preview', returns: '{ imageUrl, mimeType }', notes: 'aspectRatio נשלח כהוראה מפורשת בעברית למודל (16:9/1:1/9:16). עד 5 תמונות ייחוס.' },
+              { fn: 'krea-image', actions: 'POST { action: "generate"|"animate"|"video"|"upscale", prompt, model, width, height, imageUrls?, steps? }', desc: 'יצירת תמונות וידאו ב-Hi-Res דרך פלטפורמת Krea.', models: 'flux, seedream-4 (עד 22K), kling-2.5, veo-3', returns: '{ jobId, status, result_url }', notes: 'polling כל 5 שניות, timeout 3 דק׳ לסטילים, 6 דק׳ לוידאו. fallback של HeyGen.' },
+              { fn: 'heygen-video', actions: 'POST { action: "create_video"|"health_check", avatarId, script?, audioUrl, voiceId?, aspectRatio, avatarStyle }', desc: 'יצירת אווטאר מדבר עם סנכרון שפתיים בעברית.', models: 'HeyGen v2 (Photo Avatar + Voice Cloning)', returns: '{ videoUrl, status }', notes: 'דורש audioUrl מ-ElevenLabs (לא טקסט!) לסנכרון שפתיים מיטבי. dimension לפי aspectRatio: 9:16=720x1280, 1:1=720x720, 16:9=1280x720. Timeout: 15 דק׳.' },
+              { fn: 'runway-video', actions: 'POST { action: "image_to_video"|"text_to_video"|"get_task", promptText, promptImage?, model, duration, ratio, taskId? }', desc: 'יצירת וידאו AI קולנועי — Fallback בלבד, דורש אישור מפורש.', models: 'gen4.5 (ברירת מחדל)', returns: '{ taskId, status, url }', notes: 'נורמליזציית פרומפט (max chars). דורש activeRunId לדדופ. polling timeout: 5 דק׳. אינו ספק ברירת מחדל.' },
+              { fn: 'compose-video', actions: 'POST { timeline: { tracks: [{clips: [...]}] }, output: { format, resolution, fps } }', desc: 'הרכבה ורינדור סופי רב-שכבתי.', models: 'Shotstack (Production)', returns: '{ render_id, status, url, thumbnail }', notes: 'תומך באווטאר + B-roll + כתוביות SVG + עד 2 לוגואים + BGM. Content Rect mapping (יחסי % → פיקסלים, מתעלם מ-letterbox).' },
+              { fn: 'generate-avatar', actions: 'POST { name, source_photos[], style, pass_count: 2|3 }', desc: 'יצירת אווטאר חדש עם Identity Lock.', models: 'Gemini 3 Pro Image + variants pipeline', returns: '{ avatar_id, image_url, variants[] }', notes: '2-Pass: זהות + הבעות. 3-Pass: + פיינטיונינג. Pass 1 משמש מקור חוזר לכל ההבעות.' },
+              { fn: 'did-avatar', actions: 'POST { action: "create_talk", source_url, audio_url?, script? }', desc: 'גיבוי שני לאווטאר מדבר — D-ID.', models: 'D-ID Talks v1', returns: '{ talk_id, result_url }', notes: 'לא בשימוש כברירת מחדל. שמור לתסריטים בהם HeyGen לא מתאים.' },
             ],
           },
           {
             group: 'קול ואודיו',
             items: [
-              { fn: 'text-to-speech', desc: 'קריינות ElevenLabs eleven_v3 (he) — קולות סטנדרטיים' },
-              { fn: 'clone-voice-tts', desc: 'קריינות עם קול משוכפל אישי' },
-              { fn: 'transcribe-audio', desc: 'תמלול עברית (ElevenLabs Scribe v2) לכתוביות' },
-              { fn: 'elevenlabs-music', desc: 'יצירת מוזיקת רקע (BGM) עם ducking' },
+              { fn: 'text-to-speech', actions: 'POST { text, voice_id, language?, model_id? }', desc: 'קריינות עם קולות ElevenLabs סטנדרטיים.', models: 'eleven_v3 (he), eleven_multilingual_v2 (en/ar)', returns: '{ audio_url, duration }', notes: 'מודל נבחר אוטומטית לפי שפה. צ׳אנקים של 10–20 שניות. נשמר ב-voice_generations.' },
+              { fn: 'clone-voice-tts', actions: 'POST { text, provider_voice_id, voice_settings }', desc: 'קריינות עם קול משוכפל אישי של המשתמש.', models: 'eleven_v3 + voice cloning', returns: '{ audio_url, duration, voice_meta }', notes: 'משמש כשנבחר קול עם provider_voice_id מהספרייה. A/B verification של זהות קולית.' },
+              { fn: 'transcribe-audio', actions: 'POST { audio_url, language: "he", granularity: "word"|"sentence" }', desc: 'תמלול אודיו לכתוביות עם תזמון מדויק.', models: 'ElevenLabs Scribe v2 (LOCKED)', returns: '{ segments: [{text, start, end, words[]}] }', notes: 'נעול ל-Scribe v2 — אין מעבר ל-v1. רמת מילה לדיוק מקסימלי.' },
+              { fn: 'elevenlabs-music', actions: 'POST { action: "music"|"sound_effect", prompt|text, duration_seconds }', desc: 'יצירת מוזיקת רקע או אפקטי קול.', models: 'ElevenLabs Music + SFX', returns: '{ audio_url, duration }', notes: 'duration ברירת מחדל 30 שניות. ducking ב-12dB אוטומטי כאשר יש קריינות.' },
             ],
           },
           {
             group: 'ניהול נכסים (Capability Center)',
             items: [
-              { fn: 'avatar-manager', desc: 'CRUD על ספריית אווטארים (רשימה שטוחה)' },
-              { fn: 'voice-manager', desc: 'CRUD על ספריית קולות (כולל זהות קולית)' },
-              { fn: 'storage-manager', desc: 'URLs חתומים בזמן ריצה, מחיקה מדורגת' },
-              { fn: 'import-url', desc: 'ייבוא מדיה מ-URL (איסור פלטפורמות מוגנות)' },
+              { fn: 'avatar-manager', actions: 'POST { action: "list"|"create"|"update"|"delete", id?, payload? }', desc: 'CRUD על ספריית אווטארים.', models: '—', returns: '{ avatars[] } / { avatar }', notes: 'רשימה שטוחה (ללא תיקיות/קולקציות). מגן על תמונה מקורית בעדכון הבעות.' },
+              { fn: 'voice-manager', actions: 'POST { action: "list"|"create"|"update"|"delete"|"verify", id?, audio_url? }', desc: 'CRUD על ספריית קולות + verification.', models: '—', returns: '{ voices[] } / { voice }', notes: 'תומך ב-provider_voice_id metadata. A/B verification של זהות בעלייה.' },
+              { fn: 'storage-manager', actions: 'POST { action: "upload"|"sign"|"delete"|"list", fileName, fileType, fileBase64? }', desc: 'ניהול מדיה: העלאה, חתימה, מחיקה.', models: '—', returns: '{ url, signed_url, ttl }', notes: 'signed URLs בזמן ריצה. cascade delete כשפרויקט נמחק. bucket: media (public).' },
+              { fn: 'import-url', actions: 'POST { url }', desc: 'ייבוא מדיה מ-URL ישיר.', models: '—', returns: '{ media_url, type, size }', notes: 'HEAD timeout 10s, DOWNLOAD timeout 5 דק׳. איסור פלטפורמות מוגנות (YouTube/Instagram/TikTok).' },
             ],
           },
           {
             group: 'תוכן וטרנדים',
             items: [
-              { fn: 'firecrawl-scrape', desc: 'סריקת אתרים (Firecrawl, ראשי)' },
-              { fn: 'scrape-website-content', desc: 'סריקת אתרים (Gemini Flash, fallback)' },
-              { fn: 'fetch-trends', desc: 'משיכת טרנדים ויראליים (Perplexity, on-demand)' },
-              { fn: 'auto-fetch-trends', desc: 'משיכת טרנדים אוטומטית (pg_cron כל יומיים)' },
+              { fn: 'firecrawl-scrape', actions: 'POST { url, formats: ["markdown"|"html"] }', desc: 'סריקת אתרים ראשית (Firecrawl).', models: 'Firecrawl v1', returns: '{ markdown, html, metadata }', notes: 'timeout 20 שנ׳ למיפוי, 12 שנ׳ לסקרייפ. הספק הראשון.' },
+              { fn: 'scrape-website-content', actions: 'POST { url }', desc: 'סריקת אתרים גיבוי (Gemini Flash).', models: 'google/gemini-2.5-flash', returns: '{ content, title, summary }', notes: 'fallback כש-Firecrawl לא זמין. timeout 15 שנ׳.' },
+              { fn: 'fetch-trends', actions: 'POST { industry, category? }', desc: 'משיכת טרנדים ויראליים on-demand.', models: 'Perplexity sonar-large', returns: '{ trends: [{title, platform, url, views, summary, tip, visual_style}] }', notes: 'בדיוק 10 פוסטים מהשבוע האחרון. רק רשתות חברתיות (לא חדשות).' },
+              { fn: 'auto-fetch-trends', actions: 'POST { category? } (cron-triggered)', desc: 'משיכת טרנדים אוטומטית מתוזמנת.', models: 'Perplexity sonar-large', returns: '{ inserted_count }', notes: 'רץ דרך pg_cron כל יומיים. שומר ל-saved_trends. הפעולה האוטומטית היחידה במערכת.' },
             ],
           },
           {
             group: 'תשתית, אבטחה ובקרת עלות',
             items: [
-              { fn: 'check-credits', desc: 'בדיקת readiness מפורטת לכל ספק (auth + credits + models)' },
-              { fn: 'provider-balances', desc: 'יתרות בזמן אמת (auto-refresh כל 5 דק׳)' },
-              { fn: 'auth-gate', desc: 'שער כניסה פרטי (12345/12345) — אימות 24 שעות' },
-              { fn: 'data-manager', desc: 'גישה מבוקרת לטבלאות (RLS-aware)' },
+              { fn: 'check-credits', actions: 'POST {}', desc: 'בדיקת readiness מפורטת לכל ספק.', models: '—', returns: '{ credits: [{service, readiness, authValid, creditsAvailable, modelsAccessible, liveGenerationPassed, used, limit, statusLabel, lastFailureReason}] }', notes: 'timeout 25 שנ׳ לבדיקה. readiness: generation_verified / credits_ok / authenticated / connected / blocked_credits / blocked_env / auth_failed / error / not_configured.' },
+              { fn: 'provider-balances', actions: 'POST {}', desc: 'יתרות בזמן אמת לכל הספקים.', models: '—', returns: '{ providers: {id: {ok, remaining, total, used, unit, resetAt, reason}}, updatedAt }', notes: 'timeout 15 שנ׳ לספק. auto-refresh בכל 5 דקות מהפרונט. unknown לא חוסם.' },
+              { fn: 'auth-gate', actions: 'POST { action: "verify", username, password }', desc: 'שער כניסה פרטי לאפליקציה.', models: '—', returns: '{ token, expiresAt }', notes: 'אימות מול GATE_USERNAME/GATE_PASSWORD (secrets). session 24 שעות. localStorage על המשתמש.' },
+              { fn: 'data-manager', actions: 'POST { action: "setup"|"list_brands"|...|"insert"|"update", data? }', desc: 'גישה מבוקרת לטבלאות (CRUD מאוחד).', models: '—', returns: '{ data } / { success }', notes: 'RLS-aware. מרכז את כל פעולות ה-DB מצד הלקוח דרך פונקציה מאומתת.' },
             ],
           },
         ].map((group) => (
           <div key={group.group} className="space-y-2">
             <h3 className="text-xs font-semibold text-primary border-b border-border/40 pb-1">{group.group}</h3>
-            <ul className="space-y-1.5">
+            <ul className="space-y-2">
               {group.items.map((item) => (
-                <li key={item.fn} className="flex items-start gap-2 text-[11px]">
-                  <code className="flex-shrink-0 px-1.5 py-0.5 rounded bg-muted text-primary font-mono text-[10px] font-semibold">{item.fn}</code>
-                  <span className="text-muted-foreground">{item.desc}</span>
+                <li key={item.fn} className="bg-muted/20 border border-border/40 rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex items-start gap-2 flex-wrap">
+                    <code className="flex-shrink-0 px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-[11px] font-bold">{item.fn}</code>
+                    <span className="text-[11px] text-foreground flex-1">{item.desc}</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-1 text-[10.5px] pl-1 border-r-2 border-primary/20 pr-2">
+                    <p><strong className="text-primary">Endpoint:</strong> <code className="text-muted-foreground font-mono text-[10px]">{item.actions}</code></p>
+                    {item.models !== '—' && <p><strong className="text-primary">מודלים:</strong> <span className="text-muted-foreground font-mono text-[10px]">{item.models}</span></p>}
+                    <p><strong className="text-primary">מחזיר:</strong> <code className="text-muted-foreground font-mono text-[10px]">{item.returns}</code></p>
+                    <p><strong className="text-warning">הערות:</strong> <span className="text-muted-foreground">{item.notes}</span></p>
+                  </div>
                 </li>
               ))}
             </ul>
