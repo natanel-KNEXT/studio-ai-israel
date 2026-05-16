@@ -476,10 +476,28 @@ export function ConnectionsTab() {
           </div>
         ))}
 
-        <div className="bg-warning/5 border border-warning/20 rounded-lg p-3">
-          <p className="text-[11px] text-foreground">
-            <strong className="text-warning">הצהרה:</strong> זוהי רשימה מלאה ומדויקת של כל 22 ה-Edge Functions הפעילות בפרויקט. אין פונקציות נסתרות, אין קריאות רקע שלא מתועדות כאן. כל פונקציה ניתנת לבדיקה דרך <code className="px-1 bg-muted rounded">/proof-test</code>.
-          </p>
+        <div className="space-y-2 pt-2 border-t border-border/40">
+          <h3 className="text-xs font-semibold text-primary">תשתית — טבלאות DB ופעולות רקע</h3>
+          <ul className="space-y-1.5 text-[11px] text-muted-foreground">
+            <li><strong className="text-foreground">10 טבלאות:</strong> projects, project_outputs, project_versions, project_timeline, avatars, voices, voice_generations, scripts, brands, saved_trends</li>
+            <li><strong className="text-foreground">RLS:</strong> כל הטבלאות מוגנות (Row Level Security) — משתמש רואה רק את הנתונים שלו</li>
+            <li><strong className="text-foreground">Triggers:</strong> trigger יחיד פעיל — <code className="px-1 bg-muted rounded">projects_updated_at</code> (עדכון אוטומטי של זמן עריכה)</li>
+            <li><strong className="text-foreground">פעולות רקע מתוזמנות:</strong> <code className="px-1 bg-muted rounded">auto-fetch-trends</code> (pg_cron כל יומיים) — הפעולה היחידה שרצה אוטומטית ללא טריגר משתמש</li>
+            <li><strong className="text-foreground">אחסון:</strong> Supabase Storage עם signed URLs (פג תוקף בזמן ריצה), cascade delete</li>
+            <li><strong className="text-foreground">JWT:</strong> 22 פונקציות עם <code className="px-1 bg-muted rounded">verify_jwt=false</code> + הגנת auth-gate (12345/12345, 24 שעות)</li>
+          </ul>
+        </div>
+
+        <div className="bg-success/5 border border-success/20 rounded-lg p-3 space-y-1.5">
+          <p className="text-[11px] text-foreground"><strong className="text-success">הצהרת שקיפות מלאה:</strong></p>
+          <ul className="text-[11px] text-foreground space-y-0.5 list-disc list-inside">
+            <li>22 Edge Functions — כולן מתועדות למעלה לפי שם וייעוד</li>
+            <li>10 טבלאות DB — כולן מוצגות, כולן עם RLS</li>
+            <li>פעולה מתוזמנת אחת בלבד (auto-fetch-trends כל יומיים)</li>
+            <li>אין קריאות AI נסתרות, אין שליחת נתונים לצדדים שלישיים מעבר לספקים שמוצגים בכרטיסי הספקים למטה</li>
+            <li>כל פעולה בתשלום חוסמת את עצמה עד אישור מפורש (CostApprovalDialog)</li>
+            <li>הכל ניתן לבדיקה E2E דרך <code className="px-1 bg-muted rounded">/proof-test</code></li>
+          </ul>
         </div>
       </div>
       {/* ═══ PROVIDER STATUS CARDS ═══ */}
