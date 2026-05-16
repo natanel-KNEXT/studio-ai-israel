@@ -251,6 +251,141 @@ export function ConnectionsTab() {
         </div>
       </div>
 
+      {/* ═══ PIPELINE STAGES — detailed flow ═══ */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2 mb-1">
+          <Route className="w-5 h-5 text-primary" />
+          <h2 className="font-rubik font-semibold">שלבי הצינור — Flow מלא</h2>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">סדר ביצוע</span>
+        </div>
+        <p className="text-xs text-muted-foreground">פירוט מסודר של כל שלב בייצור הסרטון — הקלט, הכלי שמתחבר, והפלט שעובר לשלב הבא.</p>
+
+        <ol className="space-y-3">
+          {[
+            {
+              n: 1,
+              title: 'איסוף קלט וניתוח קריאייטיבי',
+              tool: 'Gemini 2.5 Pro + Firecrawl',
+              icon: Sparkles,
+              desc: 'המשתמש מכניס נושא/אתר/קובץ. אם הוזן URL — Firecrawl סורק את האתר ומחזיר תוכן נקי. Gemini מנתח קהל יעד, טון וזווית.',
+              out: 'בריף קריאייטיבי מובנה (JSON)',
+            },
+            {
+              n: 2,
+              title: 'יצירת תסריט בעברית',
+              tool: 'Gemini 2.5 Pro (fallback: Flash → GPT-4o-mini)',
+              icon: Wand2,
+              desc: 'יצירת תסריט עברי אותנטי מחולק לסצנות (3–6), עם הוראות בימוי, זוויות מצלמה ומיקרו-פעולות לכל סצנה.',
+              out: 'תסריט מסודר לפי סצנות + הוראות בימוי',
+            },
+            {
+              n: 3,
+              title: 'הרחבה והעמקה (Director Pass)',
+              tool: 'Gemini 2.5 Pro Ultra Director',
+              icon: Sparkles,
+              desc: 'העשרת כל סצנה ב-8–10 שורות בימוי — אור, מצלמה, אווירה, תזמון. שמירת זהות אווטאר (Identity Lock).',
+              out: 'תסריט מועשר מוכן ל-Prompt-to-Video',
+            },
+            {
+              n: 4,
+              title: 'אישור עלות (Cost Gate)',
+              tool: 'CostApprovalDialog',
+              icon: DollarSign,
+              desc: 'הצגת חיווי עלות מוערכת לפני שימוש בספקים בתשלום. ללא אישור מפורש — לא מתבצעת קריאה.',
+              out: 'אישור מפורש להמשך',
+            },
+            {
+              n: 5,
+              title: 'קריינות (TTS)',
+              tool: 'ElevenLabs eleven_v3 (he)',
+              icon: Mic,
+              desc: 'יצירת קריינות עברית עם הקול הנבחר מספריית הקולות. צ׳אנקים של 10–20 שניות, A/B verification של הזהות הקולית.',
+              out: 'audio_url (MP3) + duration',
+            },
+            {
+              n: 6,
+              title: 'יצירת/דיבוב אווטאר',
+              tool: 'HeyGen v2 (ברירת מחדל)',
+              icon: UserCircle,
+              desc: 'HeyGen מקבל את ה-audio_url מ-ElevenLabs (לסנכרון שפתיים מדויק בעברית). שמירת זהות חזותית — Pass 1 משמש מקור לכל ההבעות.',
+              out: 'קליפ אווטאר מדבר (MP4)',
+            },
+            {
+              n: 7,
+              title: 'יצירת תמונות/B-roll',
+              tool: 'Gemini 3 Pro Image Preview + Krea AI (Flux/Seedream)',
+              icon: ImageIcon,
+              desc: 'יצירת תמונות תומכות לסצנות (יחס מסך נשמר במדויק). Gemini Image לעברית ברורה על תמונה, Krea ל-Hi-Res עד 22K.',
+              out: 'נכסים ויזואליים לכל סצנה',
+            },
+            {
+              n: 8,
+              title: 'גיבוי וידאו (אם נדרש)',
+              tool: 'שרשרת: HeyGen → Krea → Runway → תמונה סטטית',
+              icon: ShieldCheck,
+              desc: 'אם HeyGen נכשל: Krea מנסה. אם Krea נכשל: Runway (גיבוי בלבד, ידני). אם הכל נכשל — חזרה לתמונת AI סטטית עם קריינות.',
+              out: 'קליפ וידאו או תמונה סטטית',
+            },
+            {
+              n: 9,
+              title: 'כתוביות (Subtitles)',
+              tool: 'ElevenLabs Scribe v2 + opentype.js (SVG Path)',
+              icon: Subtitles,
+              desc: 'תמלול אודיו לעברית עם תזמון מדויק. רינדור SVG Path בעברית מלאה (ללא קיצוצים, Safe Face Zone בתחתית 60%).',
+              out: 'שכבת כתוביות מסונכרנת',
+            },
+            {
+              n: 10,
+              title: 'הרכבה ורינדור סופי',
+              tool: 'Shotstack (multi-layer) + ElevenLabs Music',
+              icon: Video,
+              desc: 'הרכבה רב-שכבתית: אווטאר + B-roll + כתוביות + 2 לוגואים + BGM עם ducking אוטומטי. מיפוי קואורדינטות ל-Content Rect.',
+              out: 'וידאו סופי (MP4) + thumbnail',
+            },
+            {
+              n: 11,
+              title: 'שמירה, גרסאות ו-Output Editor',
+              tool: 'Supabase Storage + RLS + Version History',
+              icon: CheckCircle2,
+              desc: 'שמירה לא-הרסנית עם parent_output_id. URLs חתומים בזמן ריצה, מחיקה מדורגת. ניתן לערוך, לשכפל, או לחזור לגרסה.',
+              out: 'פרויקט שמור + היסטוריית גרסאות',
+            },
+          ].map(s => {
+            const Icon = s.icon;
+            return (
+              <li key={s.n} className="flex gap-3 bg-muted/20 border border-border/40 rounded-lg p-3">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/15 text-primary font-bold flex items-center justify-center text-sm">
+                  {s.n}
+                </div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Icon className="w-4 h-4 text-primary flex-shrink-0" />
+                    <h3 className="text-sm font-semibold text-foreground">{s.title}</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{s.tool}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{s.desc}</p>
+                  <p className="text-[11px] text-success flex items-center gap-1.5">
+                    <CircleDot className="w-3 h-3" />
+                    <span><strong>פלט:</strong> {s.out}</span>
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+
+        <div className="bg-info/5 border border-info/20 rounded-lg p-3 space-y-1.5">
+          <p className="text-xs font-semibold text-info flex items-center gap-1.5"><Info className="w-3.5 h-3.5" /> עקרונות חוצי-שלבים</p>
+          <ul className="text-[11px] text-foreground space-y-1 list-disc list-inside">
+            <li><strong>Fail-fast:</strong> כל שגיאה מוצגת בעברית מובנית (functionName, status, providerError) — ללא כשלים שקטים.</li>
+            <li><strong>Strict Truth:</strong> שלב נחשב מוצלח רק אחרי הוכחה E2E (ניתן לבדיקה דרך /proof-test).</li>
+            <li><strong>Cost Gate:</strong> כל פעולה בתשלום עוברת CostApprovalDialog — אין עקיפות.</li>
+            <li><strong>Observability:</strong> activeRunId + debugLogs לכל ריצה, ניתן לחזור עם resume לפי runId.</li>
+            <li><strong>Identity Lock:</strong> זהות חזותית וקולית של אווטאר נשמרת בין סצנות (Pass 1 מקור).</li>
+          </ul>
+        </div>
+      </div>
+
       {/* ═══ PROVIDER STATUS CARDS ═══ */}
       <div className="bg-card border border-border rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
