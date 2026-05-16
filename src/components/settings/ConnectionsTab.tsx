@@ -273,7 +273,7 @@ export function ConnectionsTab() {
             {
               n: 2,
               title: 'יצירת תסריט בעברית',
-              tool: 'Gemini 2.5 Pro (fallback: Flash → GPT-4o-mini)',
+              tool: 'Gemini 2.5 Flash → Pro → GPT-4o-mini (שרשרת מודלים)',
               icon: Wand2,
               desc: 'יצירת תסריט עברי אותנטי מחולק לסצנות (3–6), עם הוראות בימוי, זוויות מצלמה ומיקרו-פעולות לכל סצנה.',
               out: 'תסריט מסודר לפי סצנות + הוראות בימוי',
